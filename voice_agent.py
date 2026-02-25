@@ -1,7 +1,7 @@
 import logging
 import boto3
 import json
-import httpx
+from duckduckgo_search import DDGS
 from strands import tool
 from strands.experimental.bidi import BidiAgent
 from strands.experimental.bidi.models import BidiNovaSonicModel
@@ -20,44 +20,26 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
         logger.info(f"Agent tool: Searching knowledge base with query: {query}")
         return kb.retrieve(query)
 
-    @tool(description="Search Wikipedia for general knowledge, historical facts, or technical concepts when the user asks to search the web.")
+    @tool(description="Perform a real-time web search to find the latest news, current events, or general information from the internet.")
     async def web_search(query: str) -> str:
-        """Search Wikipedia for general knowledge."""
-        logger.info(f"Agent tool: Searching Wikipedia for: {query}")
-        
-        url = "https://en.wikipedia.org/w/api.php"
-        params = {
-            "action": "query",
-            "format": "json",
-            "prop": "extracts",
-            "exintro": True,
-            "explaintext": True,
-            "titles": query,
-            "redirects": 1
-        }
-        
+        """Perform a full web search using DuckDuckGo."""
+        logger.info(f"Agent tool: Searching the web for: {query}")
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                
-            pages = data.get("query", {}).get("pages", {})
-            if not pages:
-                return f"No Wikipedia results found for '{query}'."
+            results = []
+            with DDGS() as ddgs:
+                # Fetch top 5 results
+                for r in ddgs.text(query, max_results=5):
+                    results.append(f"Title: {r['title']}\nSnippet: {r['body']}\nSource: {r['href']}")
             
-            page_id = next(iter(pages))
-            if page_id == "-1":
-                return f"No Wikipedia results found for '{query}'."
+            if not results:
+                return f"No web search results found for '{query}'."
             
-            extract = pages[page_id].get("extract", "")
-            if not extract:
-                return f"No summary available for '{query}'."
-                
-            return extract[:800]
+            # Combine results and truncate for voice context
+            combined_results = "\n\n".join(results)
+            return combined_results[:1500] 
         except Exception as e:
-            logger.error(f"Wikipedia search failed: {e}")
-            return "Web search failed. Please try again later."
+            logger.error(f"Web search failed: {e}")
+            return "The web search service is currently unavailable. Please try again later."
 
     # Initialize a fresh model instance for THIS specific connection
     model = BidiNovaSonicModel(
@@ -77,13 +59,12 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     agent = BidiAgent(
         model=model,
         system_prompt="""You are a professional and helpful voice assistant for Voice-RAG. 
-        IMPORTANT: You have an internal knowledge base containing documents uploaded by the user.
+        IMPORTANT: You have two primary tools for finding information:
         
-        1. If the user refers to "this document", "the PDF", "the file", or asks "what is this about?", you MUST use the 'search_knowledge_base' tool first to see what's inside. Do not say you don't see any content until you have tried searching.
-        2. Use 'search_knowledge_base' for any specific questions where the answer might be in the uploaded documents.
-        3. If the user explicitly asks to 'search the web', use the 'web_search' tool.
+        1. 'search_knowledge_base': Use this FIRST for any questions about internal documents, uploaded files (PDFs/Text), or company-specific info.
+        2. 'web_search': Use this ONLY if the user explicitly asks to 'search the web' or if they ask about real-time events, news, or general knowledge NOT found in the documents.
         
-        Keep your responses very concise and conversational for real-time audio.
+        Keep your responses very concise and conversational for real-time audio interaction.
         """,
         tools=[calculator, stop_conversation, search_knowledge_base, web_search]
     )
