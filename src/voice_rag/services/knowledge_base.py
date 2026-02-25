@@ -80,9 +80,6 @@ class KnowledgeBaseService:
             filename = metadatas[i].get("filename", "Unknown")
             # Sanitize for Nova Sonic stream
             text = documents[i][:800].encode('ascii', 'ignore').decode('ascii')
-            context_parts.append(f"[Source: {filename}]
-{text}")
+            context_parts.append(f"[Source: {filename}]\n{text}")
             
-        return "
----
-".join(context_parts)
+        return "\n---\n".join(context_parts)
