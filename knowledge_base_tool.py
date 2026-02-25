@@ -39,13 +39,14 @@ def get_knowledge_base_tool(kb: KnowledgeBase, session: boto3.Session):
         """
 
         try:
+            logger.info(f"Synthesis: Sending context to Nova Lite...")
             response = bedrock.converse(
                 modelId=Config.NOVA_LITE_MODEL_ID,
                 messages=[{"role": "user", "content": [{"text": prompt}]}],
                 inferenceConfig={"maxTokens": 200, "temperature": 0}
             )
             answer = response['output']['message']['content'][0]['text']
-            logger.info(f"Synthesis successful using Nova Lite")
+            logger.info(f"Nova Lite: {answer}")
             return answer
         except Exception as e:
             logger.error(f"Nova Lite synthesis failed: {e}")

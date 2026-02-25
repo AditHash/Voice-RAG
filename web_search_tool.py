@@ -47,12 +47,15 @@ def get_web_search_tool(session: boto3.Session):
             - Speak naturally for a voice assistant.
             """
 
+            logger.info(f"Synthesis: Sending web results to Nova Lite...")
             response = bedrock.converse(
                 modelId=Config.NOVA_LITE_MODEL_ID,
                 messages=[{"role": "user", "content": [{"text": prompt}]}],
                 inferenceConfig={"maxTokens": 200, "temperature": 0}
             )
-            return response['output']['message']['content'][0]['text']
+            answer = response['output']['message']['content'][0]['text']
+            logger.info(f"Nova Lite: {answer}")
+            return answer
 
         except Exception as e:
             logger.error(f"Web search or synthesis failed: {e}")
