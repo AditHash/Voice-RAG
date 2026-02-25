@@ -19,8 +19,8 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     
     current_date = datetime.now().strftime("%A, %B %d, %Y")
     
-    # Initialize tools
-    search_documents = get_knowledge_base_tool(kb)
+    # Initialize tools with Nova Lite synthesis capabilities
+    search_documents = get_knowledge_base_tool(kb, session)
 
     # Initialize the Nova Sonic model with lower interruption sensitivity
     model = BidiNovaSonicModel(
