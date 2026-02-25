@@ -6,7 +6,7 @@ from strands import tool
 logger = logging.getLogger(__name__)
 
 @tool(description="Perform a deep web search to find real-time news, current events, or general info when not in documents.")
-async def web_search(query: str) -> str:
+async def web_search_tool(query: str) -> str:
     """Perform a comprehensive web search using DuckDuckGo."""
     logger.info(f"Tool: Deep searching the web for: {query}")
     
