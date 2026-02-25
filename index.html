@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice-RAG | Nova Sonic AI</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .container { background: #1e1e1e; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 400px; }
+        #status { margin-bottom: 1rem; color: #888; }
+        #transcript { margin-top: 1.5rem; height: 100px; overflow-y: auto; text-align: left; background: #2a2a2a; padding: 10px; border-radius: 5px; font-size: 0.9rem; }
+        button { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1rem; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .visualizer { display: flex; align-items: center; justify-content: center; height: 50px; gap: 3px; margin: 20px 0; }
+        .bar { width: 4px; height: 10px; background: #007bff; transition: 0.1s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice-RAG</h1>
+        <div id="status">Ready to talk</div>
+        <div class="visualizer" id="visualizer"></div>
+        <button id="startBtn">Start Conversation</button>
+        <div id="transcript"></div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const status = document.getElementById('status');
+        const transcript = document.getElementById('transcript');
+        const visualizer = document.getElementById('visualizer');
+        
+        // Create visualizer bars
+        for(let i=0; i<20; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            visualizer.appendChild(bar);
+        }
+
+        let ws;
+        let audioCtx;
+        let processor;
+        let source;
+
+        startBtn.onclick = async () => {
+            if (ws) {
+                location.reload(); // Simple way to reset
+                return;
+            }
+
+            try {
+                // 1. Initialize Audio Context for Mic (16kHz)
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 2. Connect WebSocket
+                ws = new WebSocket(`ws://${location.host}/ws`);
+                ws.binaryType = "arraybuffer";
+
+                ws.onopen = () => {
+                    status.innerText = "Connected! Speak now...";
+                    startBtn.innerText = "Stop Conversation";
+                    startBtn.style.background = "#dc3545";
+                    startRecording(stream);
+                };
+
+                ws.onmessage = async (e) => {
+                    if (typeof e.data === 'string') {
+                        const data = JSON.parse(e.data);
+                        if (data.event?.textOutput) {
+                            transcript.innerText = "Bot: " + data.event.textOutput.content;
+                        }
+                    } else {
+                        // Playback bot audio (24kHz raw PCM)
+                        playOutputAudio(e.data);
+                    }
+                };
+
+                ws.onclose = () => {
+                    status.innerText = "Session Ended";
+                    startBtn.disabled = true;
+                };
+
+            } catch (err) {
+                console.error(err);
+                status.innerText = "Error: " + err.message;
+            }
+        };
+
+        function startRecording(stream) {
+            source = audioCtx.createMediaStreamSource(stream);
+            // ScriptProcessor for Int16 conversion
+            processor = audioCtx.createScriptProcessor(512, 1, 1);
+            
+            source.connect(processor);
+            processor.connect(audioCtx.destination);
+
+            const bars = document.querySelectorAll('.bar');
+
+            processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                
+                // Visualization
+                const vol = inputData.reduce((a, b) => a + Math.abs(b), 0) / 512;
+                bars.forEach(b => b.style.height = (10 + vol * 500) + 'px');
+
+                // Convert Float32 to Int16
+                const output = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    output[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+                }
+                
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(output.buffer);
+                }
+            };
+        }
+
+        // Playback Buffer handling with scheduling to prevent breaking/stuttering
+        const playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        let nextStartTime = 0;
+
+        function playOutputAudio(arrayBuffer) {
+            const int16 = new Int16Array(arrayBuffer);
+            const float32 = new Float32Array(int16.length);
+            for (let i = 0; i < int16.length; i++) {
+                float32[i] = int16[i] / 0x7FFF;
+            }
+
+            const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
+            buffer.getChannelData(0).set(float32);
+            
+            const source = playbackCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(playbackCtx.destination);
+
+            // Calculate start time: either now or exactly when the last chunk ends
+            const currentTime = playbackCtx.currentTime;
+            if (nextStartTime < currentTime) {
+                // If we've fallen behind, add a tiny buffer (50ms) to start fresh
+                nextStartTime = currentTime + 0.05;
+            }
+
+            source.start(nextStartTime);
+            // Advance the clock by the duration of this chunk
+            nextStartTime += buffer.duration;
+        }
+    </script>
+</body>
+</html>
