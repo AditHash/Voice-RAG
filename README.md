@@ -35,7 +35,7 @@ The project is divided by functionality to ensure maintainability and extensibil
 1.  **Install:** `uv sync`
 2.  **Configure:** Add your AWS credentials to `.env`.
 3.  **Run:** `uv run main.py`
-4.  **Interact:** Open `http://127.0.0.1:8001`, upload a file, and start talking!
+4.  **Interact:** Open `http://127.0.0.1:8000`, upload a file, and start talking!
 
 ---
 Built for high-performance AI research and real-time document interaction.
