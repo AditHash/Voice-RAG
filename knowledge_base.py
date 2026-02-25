@@ -7,10 +7,11 @@ import fitz  # PyMuPDF
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from config import Config
+from chromadb.utils.embedding_functions import EmbeddingFunction
 
 logger = logging.getLogger(__name__)
 
-class BedrockEmbeddingFunction:
+class BedrockEmbeddingFunction(EmbeddingFunction):
     """Custom embedding function for ChromaDB using AWS Bedrock Titan V2."""
     def __init__(self, session: boto3.Session, region_name: str = Config.AWS_REGION):
         self.client = session.client("bedrock-runtime", region_name=region_name)
