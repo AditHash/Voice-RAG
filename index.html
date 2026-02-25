@@ -3,184 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice-RAG | Dashboard</title>
+    <title>Voice-RAG | AI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-dark: #0f172a;
-            --panel-dark: #1e293b;
-            --accent: #38bdf8;
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --danger: #ef4444;
-            --success: #22c55e;
-        }
-
-        body { 
-            font-family: 'Inter', system-ui, sans-serif; 
-            background: var(--bg-dark); 
-            color: var(--text-main); 
-            display: flex; 
-            height: 100vh; 
-            margin: 0; 
-            overflow: hidden;
-        }
-
-        /* Sidebar Styling */
-        .sidebar {
-            width: 300px;
-            background: var(--panel-dark);
-            border-right: 1px solid #334155;
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-        }
-
-        .sidebar h2 { font-size: 1.25rem; margin-top: 0; color: var(--accent); }
-        .sidebar p { font-size: 0.875rem; color: var(--text-dim); line-height: 1.5; }
-
-        .upload-zone {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            border: 2px dashed #475569;
-            border-radius: 12px;
-            text-align: center;
-            transition: 0.3s;
-        }
-        .upload-zone:hover { border-color: var(--accent); }
-        
-        #fileInput { display: none; }
-        .upload-btn {
-            display: inline-block;
-            background: var(--accent);
-            color: var(--bg-dark);
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-
-        /* Main Content Styling */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            position: relative;
-        }
-
-        .visualizer {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 80px;
-            gap: 4px;
-            margin-bottom: 2rem;
-        }
-        .bar { width: 6px; height: 10px; background: var(--accent); border-radius: 3px; transition: 0.1s; }
-
-        #status { font-size: 1rem; color: var(--text-dim); margin-bottom: 2rem; height: 1.5rem; font-weight: 500; }
-        
-        #startBtn {
-            background: var(--accent);
-            color: var(--bg-dark);
-            border: none;
-            padding: 1.25rem 2.5rem;
-            border-radius: 50px;
-            font-size: 1.125rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.3s;
-            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
-        }
-        #startBtn.active { background: var(--danger); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
-
-        #transcript {
-            margin-top: 3rem;
-            width: 100%;
-            max-width: 600px;
-            background: rgba(30, 41, 59, 0.5);
-            padding: 1.5rem;
-            border-radius: 16px;
-            height: 250px; /* Increased height for history */
-            overflow-y: auto;
-            font-size: 1rem;
-            line-height: 1.6;
-            border: 1px solid #334155;
-            text-align: left; /* Left align for chat style */
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .msg { padding: 0.5rem 1rem; border-radius: 12px; max-width: 85%; }
-        .msg-bot { background: #334155; align-self: flex-start; color: var(--accent); }
-        .msg-user { background: var(--accent); align-self: flex-end; color: var(--bg-dark); }
-
-        .upload-status { font-size: 0.75rem; margin-top: 1rem; color: var(--accent); }
+        body { font-family: 'Inter', sans-serif; }
+        .bar { transition: height 0.1s ease-out; }
+        /* Custom scrollbar for transcript */
+        #transcript::-webkit-scrollbar { width: 6px; }
+        #transcript::-webkit-scrollbar-track { background: transparent; }
+        #transcript::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
-<body>
-    <div class="sidebar">
-        <h2>Voice-RAG</h2>
-        <p>Your intelligent voice companion powered by AWS Nova Sonic and ChromaDB.</p>
-        
-        <div class="upload-zone">
-            <p>Add knowledge to the agent</p>
-            <label for="fileInput" class="upload-btn">Select PDF / Text</label>
-            <input type="file" id="fileInput" accept=".pdf,.txt">
-            <div id="uploadStatus" class="upload-status"></div>
+<body class="bg-slate-950 text-slate-50 flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shadow-xl">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+                Voice-RAG
+            </h1>
+            <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+                Intelligent voice assistant powered by AWS Nova Sonic and local ChromaDB.
+            </p>
         </div>
 
-        <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-dim);">
-            Connection: <span id="connStatus" style="color: var(--danger)">Disconnected</span>
+        <div class="flex-1">
+            <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 text-center border-dashed hover:border-sky-500/50 transition-colors group">
+                <p class="text-slate-300 text-sm mb-4">Expand your agent's knowledge</p>
+                <label for="fileInput" class="cursor-pointer bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl text-sm transition-all shadow-lg shadow-sky-500/20 block">
+                    Upload PDF / Text
+                </label>
+                <input type="file" id="fileInput" accept=".pdf,.txt" class="hidden">
+                <div id="uploadStatus" class="mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider"></div>
+            </div>
         </div>
-    </div>
 
-    <div class="main-content">
-        <div class="visualizer" id="visualizer"></div>
-        <div id="status">Ready to start conversation</div>
-        
-        <button id="startBtn">Start Conversation</button>
-
-        <div id="transcript">
-            <div class="msg msg-bot">Waiting for your signal...</div>
+        <div class="mt-auto pt-6 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <div id="connIndicator" class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                <span id="connStatus" class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Disconnected</span>
+            </div>
         </div>
-    </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center p-8 relative">
+        <!-- Visualizer Area -->
+        <div id="visualizer" class="flex items-center justify-center h-24 gap-1.5 mb-8">
+            <!-- Bars generated via JS -->
+        </div>
+
+        <div id="status" class="text-slate-400 font-medium tracking-wide mb-8 h-6 italic">
+            Ready to start conversation
+        </div>
+
+        <button id="startBtn" class="group relative px-10 py-4 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-lg rounded-full transition-all hover:scale-105 shadow-2xl shadow-sky-500/25 active:scale-95">
+            <span id="btnText">Start Conversation</span>
+        </button>
+
+        <!-- Transcript Area -->
+        <div id="transcript" class="mt-12 w-full max-w-2xl bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-3xl p-8 h-72 overflow-y-auto flex flex-col gap-4 shadow-inner">
+            <div class="text-slate-500 text-center italic text-sm py-10 opacity-50">
+                Conversation transcript will appear here...
+            </div>
+        </div>
+    </main>
 
     <script>
         const startBtn = document.getElementById('startBtn');
+        const btnText = document.getElementById('btnText');
         const status = document.getElementById('status');
         const connStatus = document.getElementById('connStatus');
+        const connIndicator = document.getElementById('connIndicator');
         const transcript = document.getElementById('transcript');
         const visualizer = document.getElementById('visualizer');
         const fileInput = document.getElementById('fileInput');
         const uploadStatus = document.getElementById('uploadStatus');
         
+        // Create 32 bars for the visualizer
+        for(let i=0; i<32; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'bar w-1.5 bg-sky-500 rounded-full h-2 opacity-40';
+            visualizer.appendChild(bar);
+        }
+
         // Helper to add chat messages
         function addMessage(text, role) {
-            // Find or create current active bot message if streaming
+            // Remove placeholder on first message
+            if (transcript.querySelector('.italic')) transcript.innerHTML = '';
+
             let msgDiv;
-            if (role === 'bot' && transcript.lastElementChild?.classList.contains('msg-bot-active')) {
+            if (role === 'bot' && transcript.lastElementChild?.dataset.role === 'bot-active') {
                 msgDiv = transcript.lastElementChild;
             } else {
                 msgDiv = document.createElement('div');
-                msgDiv.className = `msg ${role === 'bot' ? 'msg-bot msg-bot-active' : 'msg-user'}`;
+                msgDiv.className = role === 'bot' 
+                    ? 'msg self-start bg-slate-800 text-sky-100 px-5 py-3 rounded-2xl rounded-bl-none max-w-[85%] border border-slate-700/50 shadow-sm'
+                    : 'msg self-end bg-sky-500 text-slate-950 font-semibold px-5 py-3 rounded-2xl rounded-br-none max-w-[85%] shadow-lg shadow-sky-500/10';
+                
+                if (role === 'bot') msgDiv.dataset.role = 'bot-active';
                 transcript.appendChild(msgDiv);
             }
-            msgDiv.innerText = (role === 'bot' ? "Bot: " : "You: ") + text;
+            msgDiv.innerText = text;
             transcript.scrollTop = transcript.scrollHeight;
             return msgDiv;
-        }
-
-        // Create visualizer bars
-        for(let i=0; i<30; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'bar';
-            visualizer.appendChild(bar);
         }
 
         // File Ingestion Logic
@@ -188,6 +115,7 @@
             const file = fileInput.files[0];
             if (!file) return;
 
+            uploadStatus.className = "mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider";
             uploadStatus.innerText = "Ingesting " + file.name + "...";
             const formData = new FormData();
             formData.append('file', file);
@@ -196,14 +124,14 @@
                 const res = await fetch('/ingest', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    uploadStatus.style.color = 'var(--success)';
-                    uploadStatus.innerText = "Success! " + data.chunks_ingested + " chunks added.";
+                    uploadStatus.classList.replace('text-sky-400', 'text-emerald-400');
+                    uploadStatus.innerText = "Done! " + data.chunks_ingested + " chunks added.";
                 } else {
-                    throw new Error("Ingestion failed");
+                    throw new Error();
                 }
             } catch (err) {
-                uploadStatus.style.color = 'var(--danger)';
-                uploadStatus.innerText = "Error: " + err.message;
+                uploadStatus.classList.replace('text-sky-400', 'text-rose-400');
+                uploadStatus.innerText = "Upload failed";
             }
         };
 
@@ -228,9 +156,13 @@
                 ws.onopen = () => {
                     status.innerText = "Listening...";
                     connStatus.innerText = "Connected";
-                    connStatus.style.color = "var(--success)";
-                    startBtn.innerText = "End Session";
-                    startBtn.classList.add('active');
+                    connStatus.classList.replace('text-slate-400', 'text-emerald-400');
+                    connIndicator.classList.replace('bg-red-500', 'bg-emerald-500');
+                    connIndicator.classList.add('shadow-emerald-500/50');
+                    btnText.innerText = "End Session";
+                    startBtn.classList.replace('bg-sky-500', 'bg-rose-500');
+                    startBtn.classList.replace('hover:bg-sky-400', 'hover:bg-rose-400');
+                    startBtn.classList.replace('shadow-sky-500/25', 'shadow-rose-500/25');
                     startRecording(stream);
                 };
 
@@ -241,8 +173,7 @@
                             addMessage(data.event.textOutput.content, 'bot');
                             status.innerText = "Assistant is speaking...";
                         } else if (data.event?.userTranscript) {
-                            // Finalize any active bot message before user speaks
-                            document.querySelectorAll('.msg-bot-active').forEach(m => m.classList.remove('msg-bot-active'));
+                            document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
                             addMessage(data.event.userTranscript, 'user');
                         } else if (data.event?.statusUpdate) {
                             status.innerText = data.event.statusUpdate;
@@ -253,15 +184,11 @@
                 };
 
                 ws.onclose = () => {
-                    connStatus.innerText = "Disconnected";
-                    connStatus.style.color = "var(--danger)";
-                    status.innerText = "Session Ended";
-                    startBtn.disabled = true;
+                    location.reload();
                 };
 
             } catch (err) {
-                console.error(err);
-                status.innerText = "Error: " + err.message;
+                alert("Microphone access denied or error: " + err.message);
             }
         };
 
@@ -275,9 +202,11 @@
             processor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
                 const vol = inputData.reduce((a, b) => a + Math.abs(b), 0) / 512;
+                
                 bars.forEach((b, i) => {
-                    const h = 10 + (vol * 400 * Math.sin(i / 5 + Date.now() / 100));
-                    b.style.height = Math.max(10, h) + 'px';
+                    const h = 8 + (vol * 500 * Math.abs(Math.sin(i / 4 + Date.now() / 150)));
+                    b.style.height = Math.max(8, h) + 'px';
+                    b.style.opacity = Math.min(1, 0.3 + (vol * 5));
                 });
 
                 const output = new Int16Array(inputData.length);
