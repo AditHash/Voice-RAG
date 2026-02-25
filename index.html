@@ -3,68 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice-RAG | Chat</title>
+    <title>Voice-RAG | AI Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-slate-950 text-slate-50 flex flex-col h-screen overflow-hidden">
+<body class="bg-slate-950 text-slate-50 flex h-screen overflow-hidden">
 
-    <!-- Header -->
-    <header class="bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between shadow-xl z-10">
-        <h1 class="text-2xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
-            Voice-RAG Chat
-        </h1>
-        <div class="flex items-center gap-4">
-            <div id="connStatusArea" class="flex items-center gap-2">
-                <div id="connIndicator" class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-                <span id="connStatus" class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Disconnected</span>
-            </div>
-            <button id="resetBtn" class="text-xs text-slate-400 hover:text-rose-400 uppercase tracking-wider font-bold transition-colors">
-                Clear KB
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
-        <!-- Chat Bubbles -->
-        <div id="transcript" class="flex-1 p-4 overflow-y-auto flex flex-col gap-4">
-            <div class="msg bot-msg">
-                <div class="msg-bubble">Hello! I'm Voice-RAG, your intelligent assistant. How can I help you today?</div>
-            </div>
+    <!-- Sidebar -->
+    <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shadow-xl">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+                Voice-RAG
+            </h1>
+            <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+                Intelligent voice assistant powered by AWS Nova Sonic and local ChromaDB.
+            </p>
         </div>
 
-        <!-- Input Area (Microphone, Text Input, Visualizer, Status) -->
-        <div class="bg-slate-900 border-t border-slate-800 p-4 flex flex-col gap-3">
-            <!-- File Upload & Status -->
-            <div class="flex items-center gap-4 text-sm mb-2">
-                <label for="fileInput" class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors">
+        <div class="flex-1">
+            <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 text-center border-dashed hover:border-sky-500/50 transition-colors group">
+                <p class="text-slate-300 text-sm mb-4">Expand your agent's knowledge</p>
+                <label for="fileInput" class="cursor-pointer bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl text-sm transition-all shadow-lg shadow-sky-500/20 block">
                     Upload PDF / Text
                 </label>
                 <input type="file" id="fileInput" accept=".pdf,.txt" class="hidden">
-                <div id="uploadStatus" class="text-slate-400"></div>
-            </div>
-
-            <div class="flex items-center justify-between gap-4">
-                <!-- Visualizer -->
-                <div id="visualizer" class="flex items-center justify-center h-10 w-full gap-1.5 px-2 bg-slate-800 rounded-lg"></div>
-
-                <!-- Text Input -->
-                <input type="text" id="textInput" placeholder="Type a message..." class="flex-1 bg-slate-800 text-slate-50 border-none rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <div id="uploadStatus" class="mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider"></div>
                 
-                <!-- Send/Mic Button -->
-                <button id="startBtn" class="w-12 h-10 bg-sky-500 hover:bg-sky-400 rounded-lg flex items-center justify-center transition-colors">
-                    <svg id="micIcon" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a4 4 0 110-8 4 4 0 010 8z" />
-                    </svg>
-                    <svg id="sendIcon" class="w-6 h-6 text-white hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
+                <button id="resetBtn" class="mt-6 w-full text-[10px] text-slate-500 hover:text-rose-400 uppercase tracking-widest font-bold transition-colors">
+                    Reset Knowledge Base
                 </button>
             </div>
-             <!-- Status Display -->
-            <div id="status" class="text-sm text-slate-400 text-center mt-2 h-5">Ready to start conversation</div>
+        </div>
+
+        <div class="mt-auto pt-6 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <div id="connIndicator" class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+                <span id="connStatus" class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Disconnected</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center p-8 relative">
+        <div id="visualizer" class="flex items-center justify-center h-24 gap-1.5 mb-8"></div>
+
+        <div id="status" class="text-slate-400 font-medium tracking-wide mb-8 h-6 italic">
+            Ready to start conversation
+        </div>
+
+        <button id="startBtn" class="group relative px-10 py-4 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-lg rounded-full transition-all hover:scale-105 shadow-2xl shadow-sky-500/25 active:scale-95">
+            <span id="btnText">Start Conversation</span>
+        </button>
+
+        <div id="transcript" class="mt-12 w-full max-w-2xl bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-3xl p-8 h-72 overflow-y-auto flex flex-col gap-4 shadow-inner">
+            <div class="text-slate-500 text-center italic text-sm py-10 opacity-50">
+                Conversation transcript will appear here...
+            </div>
         </div>
     </main>
 
