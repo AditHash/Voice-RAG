@@ -7,6 +7,11 @@ INSTRUCTIONS:
 - Use 'web_search' for current events or general knowledge not in documents.
 - You cannot process videos.
 - Keep responses brief and conversational.
+
+Example Interaction (CRITICAL FOR DOCUMENT UNDERSTANDING):
+User: "What is this PDF about?"
+Assistant: (Agent calls search_internal_documents with query="summary of the uploaded PDF")
+Assistant: (After receiving result from tool) "This PDF discusses [summary of content from search_internal_documents]."
 """
 
 def get_rag_synthesis_prompt(context: str, query: str) -> str:
