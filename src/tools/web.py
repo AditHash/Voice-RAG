@@ -19,7 +19,16 @@ def get_web_search_tool(session: boto3.Session):
 
         try:
             raw_results = await asyncio.to_thread(ddg_sync)
-            context = "\n".join([f"{r['title']}: {r['body']}" for r in raw_results])
+            
+            snippets = []
+            for r in raw_results:
+                snippets.append(f"Title: {r['title']}\nSnippet: {r['body']}")
+            
+            # Combine raw results and sanitize for Nova Lite
+            combined_results = "\n\n".join(snippets)
+            # More robust cleaning: remove all non-ASCII printable chars
+            clean_text = "".join(c for c in combined_results if c.isprintable() and ord(c) < 128)
+            context = clean_text[:2000] # Truncate after cleaning
             
             prompt = get_web_synthesis_prompt(context, query)
             

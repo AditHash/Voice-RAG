@@ -24,7 +24,7 @@ class VoiceOrchestrator:
         """Assembles a specialized BidiAgent instance."""
         
         # Tools initialized with session for Nova Lite reasoning
-        search_docs = get_rag_tool(self.kb, self.session)
+        search_internal_documents = get_rag_tool(self.kb, self.session)
         web_search = get_web_search_tool(self.session)
 
         model = BidiNovaSonicModel(
@@ -42,5 +42,5 @@ class VoiceOrchestrator:
         return BidiAgent(
             model=model,
             system_prompt=get_system_prompt(self.current_date),
-            tools=[calculator, stop_conversation, search_docs, web_search]
+            tools=[calculator, stop_conversation, search_internal_documents, web_search]
         )

@@ -21,3 +21,9 @@ async def reset_kb(request: Request):
     kb: KnowledgeBaseService = request.app.state.kb
     success = kb.clear_all()
     return {"status": "success" if success else "error"}
+
+@router.get("/list")
+async def list_documents(request: Request):
+    kb: KnowledgeBaseService = request.app.state.kb
+    documents = kb.list_all_documents()
+    return {"status": "success", "documents": documents}

@@ -60,12 +60,29 @@ class KnowledgeBaseService:
 
     def clear_all(self):
         try:
-            all_ids = self.collection.get()["ids"]
-            if all_ids:
-                self.collection.delete(ids=all_ids)
+            self.chroma_client.delete_collection(name=settings.COLLECTION_NAME)
+            self.collection = self.chroma_client.get_or_create_collection(
+                name=settings.COLLECTION_NAME,
+                embedding_function=self.embedding_fn
+            )
             return True
         except Exception:
             return False
+
+    def list_all_documents(self) -> List[Dict[str, Any]]:
+        """List all unique documents in the knowledge base."""
+        try:
+            results = self.collection.get(include=["metadatas"])
+            unique_files = {}
+            for metadata in results.get("metadatas", []):
+                filename = metadata.get("filename")
+                if filename:
+                    unique_files[filename] = unique_files.get(filename, 0) + 1
+            
+            return [{"filename": fn, "chunks": count} for fn, count in unique_files.items()]
+        except Exception as e:
+            logger.error(f"Error listing documents: {e}")
+            return []
 
     def retrieve(self, query: str, n_results: int = 2) -> str:
         results = self.collection.query(query_texts=[query], n_results=n_results)
@@ -78,8 +95,9 @@ class KnowledgeBaseService:
         context_parts = []
         for i in range(len(documents)):
             filename = metadatas[i].get("filename", "Unknown")
-            # Sanitize for Nova Sonic stream
-            text = documents[i][:800].encode('ascii', 'ignore').decode('ascii')
-            context_parts.append(f"[Source: {filename}]\n{text}")
+            text = documents[i][:800]
+            # More robust cleaning: remove all non-ASCII printable chars
+            clean_text = "".join(c for c in text if c.isprintable() and ord(c) < 128)
+            context_parts.append(f"[Source: {filename}]\n{clean_text}")
             
         return "\n---\n".join(context_parts)
