@@ -70,7 +70,7 @@ class KnowledgeBase:
         
         return self.ingest_text(full_text, {"filename": filename, "type": "pdf"})
 
-    def retrieve(self, query: str, n_results: int = 3) -> str:
+    def retrieve(self, query: str, n_results: int = 2) -> str:
         """Search the knowledge base and return combined context."""
         results = self.collection.query(
             query_texts=[query],
@@ -80,6 +80,8 @@ class KnowledgeBase:
         if not documents:
             return "No relevant information found in the knowledge base."
         
-        context = "\n---\n".join(documents)
+        # Truncate each document to 800 chars to keep the tool result payload small
+        truncated_docs = [doc[:800] for doc in documents]
+        context = "\n---\n".join(truncated_docs)
         logger.info(f"Retrieved context for query: {query}")
         return context
