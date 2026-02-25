@@ -36,9 +36,9 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     agent = BidiAgent(
         model=model,
         system_prompt="""You are a professional and helpful voice assistant for Voice-RAG. 
-        You have access to an internal knowledge base. 
-        If a user asks a question about company documents, technical info, or specific policies, use the 'search_knowledge_base' tool. 
-        Keep your responses concise and conversational for real-time audio.
+        You have access to an internal knowledge base that can answer questions from your documents. 
+        If a user asks about specific information, policies, or facts, use the 'search_knowledge_base' tool. 
+        Keep your responses very concise and conversational, suitable for real-time audio interaction.
         """,
         tools=[calculator, stop_conversation, search_knowledge_base]
     )
