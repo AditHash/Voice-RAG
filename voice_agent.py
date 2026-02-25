@@ -22,13 +22,16 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     # Initialize tools
     search_documents = get_knowledge_base_tool(kb)
 
-    # Initialize the Nova Sonic model
+    # Initialize the Nova Sonic model with lower interruption sensitivity
     model = BidiNovaSonicModel(
         model_id=Config.NOVA_SONIC_MODEL_ID,
         provider_config={
             "audio": {
                 "voice": Config.VOICE_ID,
                 "output_rate": Config.OUTPUT_SAMPLE_RATE
+            },
+            "turn_detection": {
+                "endpointingSensitivity": "LOW" # Makes it less likely to stop on minor noise
             }
         },
         client_config={

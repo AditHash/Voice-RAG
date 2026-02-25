@@ -183,8 +183,11 @@
                             addMessage(data.event.textOutput.content, 'bot');
                             status.innerText = "Assistant is speaking...";
                         } else if (data.event?.userTranscript) {
-                            // STOP assistant audio immediately on user speech
-                            stopPlayback();
+                            // Only STOP if the user actually said something meaningful (more than 1-2 chars)
+                            // This prevents background clicks/noise from killing the assistant's speech
+                            if (data.event.userTranscript.trim().length > 2) {
+                                stopPlayback();
+                            }
                             document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
                             addMessage(data.event.userTranscript, 'user');
                         } else if (data.event?.statusUpdate) {
