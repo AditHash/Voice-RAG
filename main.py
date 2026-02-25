@@ -4,7 +4,6 @@ import logging
 import json
 import base64
 import boto3
-from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -20,9 +19,9 @@ from strands.experimental.bidi import (
 # Import local modules
 from knowledge_base import KnowledgeBase
 from voice_agent import create_voice_agent
+from config import Config
 
 # Initialize environment and logging
-load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -47,16 +46,15 @@ app.add_middleware(
 )
 
 # Initialize the AWS Session (Requires SigV4)
-region = os.getenv("AWS_REGION", "us-east-1")
 session = boto3.Session(
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
-    region_name=region
+    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+    aws_session_token=Config.AWS_SESSION_TOKEN,
+    region_name=Config.AWS_REGION
 )
 
 # Initialize Knowledge Base
-kb = KnowledgeBase(session, region)
+kb = KnowledgeBase(session, Config.AWS_REGION)
 
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)):
@@ -128,8 +126,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 await agent.send(BidiAudioInputEvent(
                     audio=audio_b64, 
                     format="pcm",
-                    sample_rate=16000,
-                    channels=1
+                    sample_rate=Config.INPUT_SAMPLE_RATE,
+                    channels=Config.CHANNELS
                 ))
             elif "text" in message:
                 await agent.send(message["text"])
@@ -144,4 +142,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host=Config.HOST, port=Config.PORT)
