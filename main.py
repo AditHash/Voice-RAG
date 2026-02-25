@@ -131,7 +131,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     tool_name = event.get("current_tool_use", {}).get("name", "tool")
                     status_map = {
                         "search_documents": "Searching Knowledge Base...",
-                        "web_search_tool": "Searching the web...",
+                        "web_search": "Searching the web...",
                         "calculator": "Performing calculation..."
                     }
                     display_status = status_map.get(tool_name, f"Using {tool_name}...")

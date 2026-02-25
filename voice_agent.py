@@ -10,7 +10,7 @@ from strands_tools import calculator
 from knowledge_base import KnowledgeBase
 from config import Config
 from knowledge_base_tool import get_knowledge_base_tool
-from web_search_tool import web_search_tool
+from web_search_tool import get_web_search_tool
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     
     # Initialize tools with Nova Lite synthesis capabilities
     search_documents = get_knowledge_base_tool(kb, session)
+    web_search = get_web_search_tool(session)
 
     # Initialize the Nova Sonic model with lower interruption sensitivity
     model = BidiNovaSonicModel(
@@ -49,14 +50,14 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
         1. YOU HAVE ACCESS TO FILES: If the user says "what is this pdf", "tell me about the document", "what did I upload", or any question about specific content, YOU MUST CALL the 'search_documents' tool.
         2. NEVER SAY "I don't have access to your files". You DO have access through the 'search_documents' tool.
         3. AUTOMATIC SEARCH: If the user asks a question and you don't know the answer, search the knowledge base first, then search the web.
-        4. WEB SEARCH: Use 'web_search_tool' only for real-time news, current events, or general knowledge NOT in the uploaded files.
+        4. WEB SEARCH: Use 'web_search' ONLY for real-time news, current events, or general knowledge NOT in the uploaded files.
         5. CONCISENESS: Since this is a voice interaction, be extremely brief.
         
         Example:
         User: "What is this PDF?"
         Action: Call 'search_documents' with query "summary of the document"
         """,
-        tools=[calculator, stop_conversation, search_documents, web_search_tool]
+        tools=[calculator, stop_conversation, search_documents, web_search]
     )
     
     return agent
