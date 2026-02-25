@@ -1,11 +1,15 @@
-/* Custom Voice-RAG Styles */
+/* Custom Voice-RAG Styles for Chat UI */
+
 body { font-family: 'Inter', sans-serif; }
 
-.bar { transition: height 0.1s ease-out; }
+/* Scrollbar for chat messages */
+#transcript {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #334155 transparent; /* Firefox */
+}
 
-/* Custom scrollbar for transcript */
 #transcript::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 
 #transcript::-webkit-scrollbar-track {
@@ -17,12 +21,47 @@ body { font-family: 'Inter', sans-serif; }
     border-radius: 10px;
 }
 
-/* Chat bubble animations */
-.msg {
-    animation: slideIn 0.2s ease-out;
+/* Visualizer bars */
+.bar { 
+    transition: height 0.1s ease-out, opacity 0.1s ease-out; 
+    will-change: height, opacity;
 }
 
+/* Chat bubble styling */
+.msg {
+    max-width: 70%; /* Limit bubble width */
+    animation: slideIn 0.2s ease-out forwards;
+    transform-origin: bottom; /* For a nice pop-in effect */
+}
+
+.bot-msg {
+    align-self: flex-start;
+    background-color: #1e293b; /* slate-800 */
+    color: #f8fafc; /* slate-50 */
+    border-radius: 0.75rem; /* rounded-lg */
+    border-top-left-radius: 0; /* rounded-tl-none */
+    padding: 0.75rem 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.user-msg {
+    align-self: flex-end;
+    background-color: #3b82f6; /* blue-500 */
+    color: #f8fafc; /* white */
+    border-radius: 0.75rem; /* rounded-lg */
+    border-top-right-radius: 0; /* rounded-tr-none */
+    padding: 0.75rem 1rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Pop-in animation for chat messages */
 @keyframes slideIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
