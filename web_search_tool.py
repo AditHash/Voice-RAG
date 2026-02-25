@@ -19,16 +19,13 @@ async def web_search_tool(query: str) -> str:
         
         results = []
         for r in search_results:
-            results.append(f"Source: {r['title']}
-Snippet: {r['body']}
-URL: {r['href']}")
+            text = f"Source: {r['title']}\nSnippet: {r['body']}\nURL: {r['href']}"
+            results.append(text)
         
         if not results:
             return f"No detailed results found for '{query}'."
         
-        return "
-
-".join(results)[:2000] 
+        return "\n\n".join(results)[:2000] 
     except Exception as e:
         logger.error(f"Web search failed: {e}")
         return "The web search service is currently unavailable."
