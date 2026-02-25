@@ -139,6 +139,16 @@
         let ws;
         let audioCtx;
         let nextStartTime = 0;
+        let activeSources = []; // Track active audio sources
+
+        function stopPlayback() {
+            // Immediately stop all scheduled audio chunks
+            activeSources.forEach(s => {
+                try { s.stop(); } catch(e) {}
+            });
+            activeSources = [];
+            nextStartTime = playbackCtx.currentTime;
+        }
 
         startBtn.onclick = async () => {
             if (ws) {
@@ -173,6 +183,8 @@
                             addMessage(data.event.textOutput.content, 'bot');
                             status.innerText = "Assistant is speaking...";
                         } else if (data.event?.userTranscript) {
+                            // STOP assistant audio immediately on user speech
+                            stopPlayback();
                             document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
                             addMessage(data.event.userTranscript, 'user');
                         } else if (data.event?.statusUpdate) {
@@ -229,6 +241,13 @@
             const source = playbackCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(playbackCtx.destination);
+            
+            // Add to active sources for tracking
+            activeSources.push(source);
+            source.onended = () => {
+                const index = activeSources.indexOf(source);
+                if (index > -1) activeSources.splice(index, 1);
+            };
 
             const currentTime = playbackCtx.currentTime;
             if (nextStartTime < currentTime) nextStartTime = currentTime + 0.05;
