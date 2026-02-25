@@ -97,13 +97,20 @@ async def websocket_endpoint(websocket: WebSocket):
         try:
             async for event in agent.receive():
                 if isinstance(event, BidiTranscriptStreamEvent):
-                    if event.text:
+                    # Log user transcript (if available) vs assistant transcript
+                    if event.role == "user" and event.text:
+                        logger.info(f"User: {event.text}")
+                    
+                    if event.role == "assistant" and event.text:
                         current_transcript += event.text
                         await websocket.send_text(json.dumps({
                             "event": {"textOutput": {"content": current_transcript}}
                         }))
+                    
                     if event.is_final:
-                        current_transcript = ""
+                        if event.role == "assistant":
+                            logger.info(f"Assistant: {current_transcript}")
+                            current_transcript = ""
                 elif isinstance(event, BidiAudioStreamEvent):
                     if event.audio:
                         audio_bytes = base64.b64decode(event.audio)
@@ -142,6 +149,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     channels=Config.CHANNELS
                 ))
             elif "text" in message:
+                logger.info(f"User (Text): {message['text']}")
                 await agent.send(message["text"])
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
