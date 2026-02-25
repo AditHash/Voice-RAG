@@ -1,178 +1,58 @@
-import os
-import asyncio
 import logging
-import json
-import base64
-import boto3
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+import uvicorn
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
-# Import BidiAgent and its dependencies
-from strands.experimental.bidi import (
-    BidiTranscriptStreamEvent,
-    BidiAudioStreamEvent,
-    BidiInterruptionEvent,
-    BidiAudioInputEvent,
-    ToolUseStreamEvent
-)
+from src.voice_rag.core.config import settings
+from src.voice_rag.core.auth import get_aws_session
+from src.voice_rag.services.knowledge_base import KnowledgeBaseService
+from src.voice_rag.services.voice_orchestrator import VoiceOrchestrator
+from src.voice_rag.api.routes import ingest, websocket
 
-# Import local modules
-from knowledge_base import KnowledgeBase
-from voice_agent import create_voice_agent
-from config import Config
-
-# Initialize environment and logging
-logging.basicConfig(level=logging.INFO)
+# Setup Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Universal Authentication Resolver ---
-# This ensures it works with 1) Bedrock API Key, 2) SigV4 Keys, or 3) AWS SSO Sessions
+def create_app() -> FastAPI:
+    app = FastAPI(title=settings.PROJECT_NAME)
 
-if Config.BEDROCK_API_KEY:
-    # Set it as a bearer token for Bedrock clients (e.g. Converse, Embeddings)
-    os.environ['AWS_BEARER_TOKEN_BEDROCK'] = Config.BEDROCK_API_KEY
-    logger.info("Auth: Found BEDROCK_API_KEY. Configured as Bearer Token.")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# If we have keys in the .env, we clear SSO profile to avoid refresh crashes
-if Config.AWS_ACCESS_KEY_ID and Config.AWS_SECRET_ACCESS_KEY:
-    os.environ.pop("AWS_PROFILE", None)
-    os.environ.pop("AWS_DEFAULT_PROFILE", None)
-    logger.info("Auth: Found SigV4 keys in environment. Prioritizing over SSO profiles.")
+    # Dependency Initialization
+    session = get_aws_session()
+    kb_service = KnowledgeBaseService(session)
+    orchestrator = VoiceOrchestrator(session, kb_service)
 
-# Initialize the AWS Session with available credentials
-session = boto3.Session(
-    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
-    aws_session_token=Config.AWS_SESSION_TOKEN,
-    region_name=Config.AWS_REGION
-)
-# --- End of Auth Resolver ---
+    # Store in app state for route access
+    app.state.kb = kb_service
+    app.state.orchestrator = orchestrator
 
-app = FastAPI()
+    # Include Routes
+    app.include_router(ingest.router)
+    app.include_router(websocket.router)
 
-# Initialize Knowledge Base
-kb = KnowledgeBase(session, Config.AWS_REGION)
+    @app.get("/", response_class=HTMLResponse)
+    async def index():
+        with open("index.html", "r") as f:
+            return f.read()
 
-@app.post("/ingest")
-async def ingest_document(file: UploadFile = File(...)):
-    """API to ingest documents (PDF or Text) into the Knowledge Base."""
-    content = await file.read()
-    if file.filename.lower().endswith(".pdf"):
-        num_chunks = kb.ingest_pdf(content, file.filename)
-    else:
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content.decode("latin-1")
-        num_chunks = kb.ingest_text(text, {"filename": file.filename, "type": "text"})
-    return {"status": "success", "filename": file.filename, "chunks_ingested": num_chunks}
-
-@app.post("/reset")
-async def reset_knowledge_base():
-    """API to clear all data from the knowledge base."""
-    success = kb.clear_database()
-    return {"status": "success" if success else "error"}
-
-@app.post("/retrieve")
-async def retrieve_info(query: str):
-    """Diagnostic API to search the Knowledge Base manually."""
-    context = kb.retrieve(query)
-    return {"query": query, "context": context}
-
-@app.get("/", response_class=HTMLResponse)
-async def get_ui():
-    """Serve the single-page web UI."""
-    with open("index.html", "r") as f:
-        return f.read()
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """Bridge the WebSocket to the BidiAgent."""
-    await websocket.accept()
+    # Legacy compatibility redirects
+    @app.post("/ingest")
+    async def legacy_ingest(file=None): return await ingest.ingest_document(None, file)
     
-    # Each connection gets its own BidiAgent instance
-    agent = create_voice_agent(session, kb)
+    @app.post("/reset")
+    async def legacy_reset(): return await ingest.reset_kb(None)
 
-    await agent.start()
-    logger.info("BidiAgent session started")
+    return app
 
-    async def receive_from_agent():
-        """Handle output events from the agent and forward to the client."""
-        current_transcript = ""
-        try:
-            async for event in agent.receive():
-                if isinstance(event, BidiTranscriptStreamEvent):
-                    # Log user transcript (if available) vs assistant transcript
-                    if event.role == "user" and event.text:
-                        logger.info(f"User: {event.text}")
-                        # Send user transcript to frontend
-                        await websocket.send_text(json.dumps({
-                            "event": {"userTranscript": event.text}
-                        }))
-                    
-                    if event.role == "assistant" and event.text:
-                        current_transcript += event.text
-                        await websocket.send_text(json.dumps({
-                            "event": {"textOutput": {"content": current_transcript}}
-                        }))
-                    
-                    if event.is_final:
-                        if event.role == "assistant":
-                            logger.info(f"Assistant: {current_transcript}")
-                            current_transcript = ""
-                elif isinstance(event, BidiAudioStreamEvent):
-                    if event.audio:
-                        audio_bytes = base64.b64decode(event.audio)
-                        await websocket.send_bytes(audio_bytes)
-                elif isinstance(event, ToolUseStreamEvent):
-                    # Notify frontend that the agent is using a tool
-                    # Event inherits from dict, access keys directly
-                    tool_name = event.get("current_tool_use", {}).get("name", "tool")
-                    status_map = {
-                        "search_documents": "Searching Knowledge Base...",
-                        "web_search": "Searching the web...",
-                        "calculator": "Performing calculation..."
-                    }
-                    display_status = status_map.get(tool_name, f"Using {tool_name}...")
-                    await websocket.send_text(json.dumps({
-                        "event": {
-                            "statusUpdate": display_status
-                        }
-                    }))
-                elif isinstance(event, BidiInterruptionEvent):
-                    logger.info("User interrupted assistant")
-        except Exception as e:
-            logger.error(f"Error receiving from agent: {e}")
-
-    # Start a background task for agent outputs
-    receiver_task = asyncio.create_task(receive_from_agent())
-
-    try:
-        while True:
-            message = await websocket.receive()
-            if "bytes" in message:
-                audio_b64 = base64.b64encode(message["bytes"]).decode('utf-8')
-                await agent.send(BidiAudioInputEvent(
-                    audio=audio_b64, 
-                    format="pcm",
-                    sample_rate=Config.INPUT_SAMPLE_RATE,
-                    channels=Config.CHANNELS
-                ))
-            elif "text" in message:
-                logger.info(f"User (Text): {message['text']}")
-                await agent.send(message["text"])
-    except WebSocketDisconnect:
-        logger.info("WebSocket disconnected")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-    finally:
-        await agent.stop()
-        receiver_task.cancel()
-        # Automatically clear knowledge base after each conversation
-        kb.clear_database()
-        logger.info("BidiAgent session stopped and KB cleared")
+app = create_app()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host=Config.HOST, port=Config.PORT)
+    uvicorn.run(app, host=settings.HOST, port=settings.PORT)

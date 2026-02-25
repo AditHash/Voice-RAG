@@ -90,7 +90,7 @@
         resetBtn.onclick = async () => {
             if (!confirm("Clear all uploaded documents?")) return;
             try {
-                const res = await fetch('/reset', { method: 'POST' });
+                const res = await fetch('/api/knowledge/reset', { method: 'POST' });
                 const data = await res.json();
                 if (data.status === 'success') {
                     uploadStatus.style.color = 'var(--accent)';
@@ -141,11 +141,11 @@
             formData.append('file', file);
 
             try {
-                const res = await fetch('/ingest', { method: 'POST', body: formData });
+                const res = await fetch('/api/knowledge/ingest', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.status === 'success') {
                     uploadStatus.classList.replace('text-sky-400', 'text-emerald-400');
-                    uploadStatus.innerText = "Done! " + data.chunks_ingested + " chunks added.";
+                    uploadStatus.innerText = "Done! " + data.chunks + " chunks added.";
                 } else {
                     throw new Error();
                 }
