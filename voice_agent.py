@@ -1,11 +1,12 @@
 import logging
 import boto3
 import json
+import httpx
 from strands import tool
 from strands.experimental.bidi import BidiAgent
 from strands.experimental.bidi.models import BidiNovaSonicModel
 from strands.experimental.bidi.tools import stop_conversation
-from strands_tools import calculator, http_request
+from strands_tools import calculator
 from knowledge_base import KnowledgeBase
 from config import Config
 
@@ -21,8 +22,10 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
 
     @tool(description="Search Wikipedia for general knowledge, historical facts, or technical concepts when the user asks to search the web.")
     async def web_search(query: str) -> str:
+        """Search Wikipedia for general knowledge."""
         logger.info(f"Agent tool: Searching Wikipedia for: {query}")
         
+        url = "https://en.wikipedia.org/w/api.php"
         params = {
             "action": "query",
             "format": "json",
@@ -34,12 +37,11 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
         }
         
         try:
-            response_str = await http_request(
-                url="https://en.wikipedia.org/w/api.php",
-                method="GET",
-                params=params
-            )
-            data = json.loads(response_str)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
             pages = data.get("query", {}).get("pages", {})
             if not pages:
                 return f"No Wikipedia results found for '{query}'."
@@ -49,6 +51,9 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
                 return f"No Wikipedia results found for '{query}'."
             
             extract = pages[page_id].get("extract", "")
+            if not extract:
+                return f"No summary available for '{query}'."
+                
             return extract[:800]
         except Exception as e:
             logger.error(f"Wikipedia search failed: {e}")
