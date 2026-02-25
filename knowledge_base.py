@@ -80,8 +80,8 @@ class KnowledgeBase:
         if not documents:
             return "No relevant information found in the knowledge base."
         
-        # Truncate each document to 800 chars to keep the tool result payload small
-        truncated_docs = [doc[:800] for doc in documents]
+        # Truncate and clean text (remove non-printable/hidden characters)
+        truncated_docs = [doc[:800].encode('ascii', 'ignore').decode('ascii') for doc in documents]
         context = "\n---\n".join(truncated_docs)
         logger.info(f"Retrieved context for query: {query}")
         return context

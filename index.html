@@ -194,7 +194,8 @@
 
         function startRecording(stream) {
             const source = audioCtx.createMediaStreamSource(stream);
-            const processor = audioCtx.createScriptProcessor(512, 1, 1);
+            // Increased buffer to 2048 to reduce event frequency
+            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
             source.connect(processor);
             processor.connect(audioCtx.destination);
 

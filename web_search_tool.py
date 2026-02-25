@@ -25,7 +25,10 @@ async def web_search_tool(query: str) -> str:
         if not results:
             return f"No detailed results found for '{query}'."
         
-        return "\n\n".join(results)[:2000] 
+        # Clean and truncate combined content
+        full_text = "\n\n".join(results)
+        safe_text = full_text.encode('ascii', 'ignore').decode('ascii')
+        return safe_text[:1500] 
     except Exception as e:
         logger.error(f"Web search failed: {e}")
         return "The web search service is currently unavailable."
