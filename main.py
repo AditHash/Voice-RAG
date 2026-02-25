@@ -64,11 +64,21 @@ search_tool = create_retrieval_tool(rag_manager)
 
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)):
-    """API to ingest documents into the Knowledge Base."""
+    """API to ingest documents (PDF or Text) into the Knowledge Base."""
     content = await file.read()
-    text = content.decode("utf-8")
-    num_chunks = rag_manager.ingest_text(text, {"filename": file.filename})
-    return {"status": "success", "chunks_ingested": num_chunks}
+    
+    if file.filename.lower().endswith(".pdf"):
+        num_chunks = rag_manager.ingest_pdf(content, file.filename)
+    else:
+        # Assume text
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            # Fallback to latin-1 if utf-8 fails
+            text = content.decode("latin-1")
+        num_chunks = rag_manager.ingest_text(text, {"filename": file.filename, "type": "text"})
+    
+    return {"status": "success", "filename": file.filename, "chunks_ingested": num_chunks}
 
 @app.post("/retrieve")
 async def retrieve_info(query: str):
