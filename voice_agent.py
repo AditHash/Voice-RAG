@@ -1,10 +1,11 @@
 import logging
 import boto3
-from strands.experimental.bidi import BidiAgent, BidiModel
+from strands.experimental.bidi import BidiAgent
 from strands.experimental.bidi.models import BidiNovaSonicModel
 from strands.experimental.bidi.tools import stop_conversation
 from strands_tools import calculator
 from knowledge_base import KnowledgeBase
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,11 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
 
     # Initialize a fresh model instance for THIS specific connection
     model = BidiNovaSonicModel(
-        model_id="amazon.nova-2-sonic-v1:0",
+        model_id=Config.NOVA_SONIC_MODEL_ID,
         provider_config={
             "audio": {
-                "voice": "matthew",
-                "output_rate": 24000
+                "voice": Config.VOICE_ID,
+                "output_rate": Config.OUTPUT_SAMPLE_RATE
             }
         },
         client_config={
