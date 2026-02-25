@@ -19,6 +19,9 @@ ENV/
 .env.local
 .env.*.local
 
+# Databases
+chroma_db/
+
 # Logs
 *.log
 REFACTOR_LOG.md.bak
@@ -30,3 +33,5 @@ REFACTOR_LOG.md.bak
 # OS
 .DS_Store
 Thumbs.db
+
+chroma_db/
