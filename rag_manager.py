@@ -3,6 +3,7 @@ import json
 import logging
 import boto3
 import chromadb
+import fitz  # PyMuPDF
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -58,6 +59,15 @@ class RAGManager:
         )
         logger.info(f"Ingested {len(chunks)} chunks into ChromaDB.")
         return len(chunks)
+
+    def ingest_pdf(self, pdf_bytes: bytes, filename: str):
+        """Extract text from PDF and ingest it."""
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text()
+        
+        return self.ingest_text(full_text, {"filename": filename, "type": "pdf"})
 
     def retrieve(self, query: str, n_results: int = 3) -> str:
         """Search the knowledge base and return combined context."""
