@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def get_rag_tool(kb: KnowledgeBaseService, session: boto3.Session):
     bedrock = session.client("bedrock-runtime", region_name=settings.AWS_REGION)
 
-    @tool(name="search_documents", description="Use to search uploaded files and PDFs for specific info.")
+    @tool(name="search_documents", description="MANDATORY tool to use when the user asks about uploaded files, PDFs, 'this document', or any specific info. You DO have access to files through this tool.")
     async def search_documents(query: str) -> str:
         context = kb.retrieve(query)
         if "No relevant information" in context: return context
