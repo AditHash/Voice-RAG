@@ -68,6 +68,12 @@ async def ingest_document(file: UploadFile = File(...)):
         num_chunks = kb.ingest_text(text, {"filename": file.filename, "type": "text"})
     return {"status": "success", "filename": file.filename, "chunks_ingested": num_chunks}
 
+@app.post("/reset")
+async def reset_knowledge_base():
+    """API to clear all data from the knowledge base."""
+    success = kb.clear_database()
+    return {"status": "success" if success else "error"}
+
 @app.post("/retrieve")
 async def retrieve_info(query: str):
     """Diagnostic API to search the Knowledge Base manually."""

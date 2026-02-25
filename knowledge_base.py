@@ -70,18 +70,38 @@ class KnowledgeBase:
         
         return self.ingest_text(full_text, {"filename": filename, "type": "pdf"})
 
+    def clear_database(self):
+        """Delete all documents from the collection."""
+        try:
+            # Get all IDs and delete them
+            all_ids = self.collection.get()["ids"]
+            if all_ids:
+                self.collection.delete(ids=all_ids)
+            logger.info("Knowledge base cleared.")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing database: {e}")
+            return False
+
     def retrieve(self, query: str, n_results: int = 2) -> str:
-        """Search the knowledge base and return combined context."""
+        """Search the knowledge base and return combined context with source info."""
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results
         )
+        
         documents = results.get("documents", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
+        
         if not documents:
             return "No relevant information found in the knowledge base."
         
-        # Truncate and clean text (remove non-printable/hidden characters)
-        truncated_docs = [doc[:800].encode('ascii', 'ignore').decode('ascii') for doc in documents]
-        context = "\n---\n".join(truncated_docs)
+        context_parts = []
+        for i in range(len(documents)):
+            filename = metadatas[i].get("filename", "Unknown File")
+            text = documents[i][:800].encode('ascii', 'ignore').decode('ascii')
+            context_parts.append(f"[Source: {filename}]\n{text}")
+            
+        context = "\n---\n".join(context_parts)
         logger.info(f"Retrieved context for query: {query}")
         return context

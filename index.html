@@ -36,6 +36,10 @@
                 </label>
                 <input type="file" id="fileInput" accept=".pdf,.txt" class="hidden">
                 <div id="uploadStatus" class="mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider"></div>
+                
+                <button id="resetBtn" class="mt-6 w-full text-[10px] text-slate-500 hover:text-rose-400 uppercase tracking-widest font-bold transition-colors">
+                    Reset Knowledge Base
+                </button>
             </div>
         </div>
 
@@ -80,7 +84,23 @@
         const visualizer = document.getElementById('visualizer');
         const fileInput = document.getElementById('fileInput');
         const uploadStatus = document.getElementById('uploadStatus');
+        const resetBtn = document.getElementById('resetBtn');
         
+        // Reset Logic
+        resetBtn.onclick = async () => {
+            if (!confirm("Clear all uploaded documents?")) return;
+            try {
+                const res = await fetch('/reset', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    uploadStatus.style.color = 'var(--accent)';
+                    uploadStatus.innerText = "Knowledge Base Cleared";
+                }
+            } catch (err) {
+                console.error("Reset failed", err);
+            }
+        };
+
         // Create 32 bars for the visualizer
         for(let i=0; i<32; i++) {
             const bar = document.createElement('div');
