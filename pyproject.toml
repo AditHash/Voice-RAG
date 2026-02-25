@@ -19,4 +19,5 @@ dependencies = [
     "langchain-text-splitters>=1.1.1",
     "pymupdf>=1.27.1",
     "nest-asyncio>=1.6.0",
+    "httpx>=0.28.1",
 ]
