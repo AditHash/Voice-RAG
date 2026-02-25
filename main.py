@@ -100,6 +100,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Log user transcript (if available) vs assistant transcript
                     if event.role == "user" and event.text:
                         logger.info(f"User: {event.text}")
+                        # Send user transcript to frontend
+                        await websocket.send_text(json.dumps({
+                            "event": {"userTranscript": event.text}
+                        }))
                     
                     if event.role == "assistant" and event.text:
                         current_transcript += event.text

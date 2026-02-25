@@ -105,13 +105,20 @@
             background: rgba(30, 41, 59, 0.5);
             padding: 1.5rem;
             border-radius: 16px;
-            height: 120px;
+            height: 250px; /* Increased height for history */
             overflow-y: auto;
-            font-size: 1.125rem;
+            font-size: 1rem;
             line-height: 1.6;
             border: 1px solid #334155;
-            text-align: center;
+            text-align: left; /* Left align for chat style */
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
+
+        .msg { padding: 0.5rem 1rem; border-radius: 12px; max-width: 85%; }
+        .msg-bot { background: #334155; align-self: flex-start; color: var(--accent); }
+        .msg-user { background: var(--accent); align-self: flex-end; color: var(--bg-dark); }
 
         .upload-status { font-size: 0.75rem; margin-top: 1rem; color: var(--accent); }
     </style>
@@ -139,7 +146,9 @@
         
         <button id="startBtn">Start Conversation</button>
 
-        <div id="transcript">Bot is waiting for your signal...</div>
+        <div id="transcript">
+            <div class="msg msg-bot">Waiting for your signal...</div>
+        </div>
     </div>
 
     <script>
@@ -151,6 +160,22 @@
         const fileInput = document.getElementById('fileInput');
         const uploadStatus = document.getElementById('uploadStatus');
         
+        // Helper to add chat messages
+        function addMessage(text, role) {
+            // Find or create current active bot message if streaming
+            let msgDiv;
+            if (role === 'bot' && transcript.lastElementChild?.classList.contains('msg-bot-active')) {
+                msgDiv = transcript.lastElementChild;
+            } else {
+                msgDiv = document.createElement('div');
+                msgDiv.className = `msg ${role === 'bot' ? 'msg-bot msg-bot-active' : 'msg-user'}`;
+                transcript.appendChild(msgDiv);
+            }
+            msgDiv.innerText = (role === 'bot' ? "Bot: " : "You: ") + text;
+            transcript.scrollTop = transcript.scrollHeight;
+            return msgDiv;
+        }
+
         // Create visualizer bars
         for(let i=0; i<30; i++) {
             const bar = document.createElement('div');
@@ -213,8 +238,12 @@
                     if (typeof e.data === 'string') {
                         const data = JSON.parse(e.data);
                         if (data.event?.textOutput) {
-                            transcript.innerText = data.event.textOutput.content;
+                            addMessage(data.event.textOutput.content, 'bot');
                             status.innerText = "Assistant is speaking...";
+                        } else if (data.event?.userTranscript) {
+                            // Finalize any active bot message before user speaks
+                            document.querySelectorAll('.msg-bot-active').forEach(m => m.classList.remove('msg-bot-active'));
+                            addMessage(data.event.userTranscript, 'user');
                         } else if (data.event?.statusUpdate) {
                             status.innerText = data.event.statusUpdate;
                         }
