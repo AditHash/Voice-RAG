@@ -3,6 +3,7 @@ import boto3
 from strands import tool
 from src.voice_rag.services.knowledge_base import KnowledgeBaseService
 from src.voice_rag.core.config import settings
+from src.voice_rag.core.prompts import get_rag_synthesis_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,7 @@ def get_rag_tool(kb: KnowledgeBaseService, session: boto3.Session):
         context = kb.retrieve(query)
         if "No relevant information" in context: return context
 
-        prompt = f"Using this context: {context}
-
-Answer concisely: {query}"
+        prompt = get_rag_synthesis_prompt(context, query)
         
         try:
             response = bedrock.converse(

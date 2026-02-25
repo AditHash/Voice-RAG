@@ -6,14 +6,7 @@
     <title>Voice-RAG | AI Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .bar { transition: height 0.1s ease-out; }
-        /* Custom scrollbar for transcript */
-        #transcript::-webkit-scrollbar { width: 6px; }
-        #transcript::-webkit-scrollbar-track { background: transparent; }
-        #transcript::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-slate-950 text-slate-50 flex h-screen overflow-hidden">
 
@@ -53,10 +46,7 @@
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col items-center justify-center p-8 relative">
-        <!-- Visualizer Area -->
-        <div id="visualizer" class="flex items-center justify-center h-24 gap-1.5 mb-8">
-            <!-- Bars generated via JS -->
-        </div>
+        <div id="visualizer" class="flex items-center justify-center h-24 gap-1.5 mb-8"></div>
 
         <div id="status" class="text-slate-400 font-medium tracking-wide mb-8 h-6 italic">
             Ready to start conversation
@@ -66,7 +56,6 @@
             <span id="btnText">Start Conversation</span>
         </button>
 
-        <!-- Transcript Area -->
         <div id="transcript" class="mt-12 w-full max-w-2xl bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-3xl p-8 h-72 overflow-y-auto flex flex-col gap-4 shadow-inner">
             <div class="text-slate-500 text-center italic text-sm py-10 opacity-50">
                 Conversation transcript will appear here...
@@ -74,209 +63,6 @@
         </div>
     </main>
 
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const btnText = document.getElementById('btnText');
-        const status = document.getElementById('status');
-        const connStatus = document.getElementById('connStatus');
-        const connIndicator = document.getElementById('connIndicator');
-        const transcript = document.getElementById('transcript');
-        const visualizer = document.getElementById('visualizer');
-        const fileInput = document.getElementById('fileInput');
-        const uploadStatus = document.getElementById('uploadStatus');
-        const resetBtn = document.getElementById('resetBtn');
-        
-        // Reset Logic
-        resetBtn.onclick = async () => {
-            if (!confirm("Clear all uploaded documents?")) return;
-            try {
-                const res = await fetch('/api/knowledge/reset', { method: 'POST' });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    uploadStatus.style.color = 'var(--accent)';
-                    uploadStatus.innerText = "Knowledge Base Cleared";
-                }
-            } catch (err) {
-                console.error("Reset failed", err);
-            }
-        };
-
-        // Create 32 bars for the visualizer
-        for(let i=0; i<32; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'bar w-1.5 bg-sky-500 rounded-full h-2 opacity-40';
-            visualizer.appendChild(bar);
-        }
-
-        // Helper to add chat messages
-        function addMessage(text, role) {
-            // Remove placeholder on first message
-            if (transcript.querySelector('.italic')) transcript.innerHTML = '';
-
-            let msgDiv;
-            if (role === 'bot' && transcript.lastElementChild?.dataset.role === 'bot-active') {
-                msgDiv = transcript.lastElementChild;
-            } else {
-                msgDiv = document.createElement('div');
-                msgDiv.className = role === 'bot' 
-                    ? 'msg self-start bg-slate-800 text-sky-100 px-5 py-3 rounded-2xl rounded-bl-none max-w-[85%] border border-slate-700/50 shadow-sm'
-                    : 'msg self-end bg-sky-500 text-slate-950 font-semibold px-5 py-3 rounded-2xl rounded-br-none max-w-[85%] shadow-lg shadow-sky-500/10';
-                
-                if (role === 'bot') msgDiv.dataset.role = 'bot-active';
-                transcript.appendChild(msgDiv);
-            }
-            msgDiv.innerText = text;
-            transcript.scrollTop = transcript.scrollHeight;
-            return msgDiv;
-        }
-
-        // File Ingestion Logic
-        fileInput.onchange = async () => {
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            uploadStatus.className = "mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider";
-            uploadStatus.innerText = "Ingesting " + file.name + "...";
-            const formData = new FormData();
-            formData.append('file', file);
-
-            try {
-                const res = await fetch('/api/knowledge/ingest', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    uploadStatus.classList.replace('text-sky-400', 'text-emerald-400');
-                    uploadStatus.innerText = "Done! " + data.chunks + " chunks added.";
-                } else {
-                    throw new Error();
-                }
-            } catch (err) {
-                uploadStatus.classList.replace('text-sky-400', 'text-rose-400');
-                uploadStatus.innerText = "Upload failed";
-            }
-        };
-
-        // Voice WebSocket Logic
-        let ws;
-        let audioCtx;
-        let nextStartTime = 0;
-        let activeSources = []; // Track active audio sources
-
-        function stopPlayback() {
-            // Immediately stop all scheduled audio chunks
-            activeSources.forEach(s => {
-                try { s.stop(); } catch(e) {}
-            });
-            activeSources = [];
-            nextStartTime = playbackCtx.currentTime;
-        }
-
-        startBtn.onclick = async () => {
-            if (ws) {
-                location.reload();
-                return;
-            }
-
-            try {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                
-                ws = new WebSocket(`ws://${location.host}/ws`);
-                ws.binaryType = "arraybuffer";
-
-                ws.onopen = () => {
-                    status.innerText = "Listening...";
-                    connStatus.innerText = "Connected";
-                    connStatus.classList.replace('text-slate-400', 'text-emerald-400');
-                    connIndicator.classList.replace('bg-red-500', 'bg-emerald-500');
-                    connIndicator.classList.add('shadow-emerald-500/50');
-                    btnText.innerText = "End Session";
-                    startBtn.classList.replace('bg-sky-500', 'bg-rose-500');
-                    startBtn.classList.replace('hover:bg-sky-400', 'hover:bg-rose-400');
-                    startBtn.classList.replace('shadow-sky-500/25', 'shadow-rose-500/25');
-                    startRecording(stream);
-                };
-
-                ws.onmessage = async (e) => {
-                    if (typeof e.data === 'string') {
-                        const data = JSON.parse(e.data);
-                        if (data.event?.textOutput) {
-                            addMessage(data.event.textOutput.content, 'bot');
-                            status.innerText = "Assistant is speaking...";
-                        } else if (data.event?.userTranscript) {
-                            // Only STOP if the user actually said something meaningful (more than 1-2 chars)
-                            // This prevents background clicks/noise from killing the assistant's speech
-                            if (data.event.userTranscript.trim().length > 2) {
-                                stopPlayback();
-                            }
-                            document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
-                            addMessage(data.event.userTranscript, 'user');
-                        } else if (data.event?.statusUpdate) {
-                            status.innerText = data.event.statusUpdate;
-                        }
-                    } else {
-                        playOutputAudio(e.data);
-                    }
-                };
-
-                ws.onclose = () => {
-                    location.reload();
-                };
-
-            } catch (err) {
-                alert("Microphone access denied or error: " + err.message);
-            }
-        };
-
-        function startRecording(stream) {
-            const source = audioCtx.createMediaStreamSource(stream);
-            // Increased buffer to 2048 to reduce event frequency
-            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-            source.connect(processor);
-            processor.connect(audioCtx.destination);
-
-            const bars = document.querySelectorAll('.bar');
-            processor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const vol = inputData.reduce((a, b) => a + Math.abs(b), 0) / 512;
-                
-                bars.forEach((b, i) => {
-                    const h = 8 + (vol * 500 * Math.abs(Math.sin(i / 4 + Date.now() / 150)));
-                    b.style.height = Math.max(8, h) + 'px';
-                    b.style.opacity = Math.min(1, 0.3 + (vol * 5));
-                });
-
-                const output = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                    output[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-                }
-                if (ws.readyState === WebSocket.OPEN) ws.send(output.buffer);
-            };
-        }
-
-        const playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-        function playOutputAudio(arrayBuffer) {
-            const int16 = new Int16Array(arrayBuffer);
-            const float32 = new Float32Array(int16.length);
-            for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x7FFF;
-
-            const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
-            buffer.getChannelData(0).set(float32);
-            const source = playbackCtx.createBufferSource();
-            source.buffer = buffer;
-            source.connect(playbackCtx.destination);
-            
-            // Add to active sources for tracking
-            activeSources.push(source);
-            source.onended = () => {
-                const index = activeSources.indexOf(source);
-                if (index > -1) activeSources.splice(index, 1);
-            };
-
-            const currentTime = playbackCtx.currentTime;
-            if (nextStartTime < currentTime) nextStartTime = currentTime + 0.05;
-            source.start(nextStartTime);
-            nextStartTime += buffer.duration;
-        }
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,28 @@
+/* Custom Voice-RAG Styles */
+body { font-family: 'Inter', sans-serif; }
+
+.bar { transition: height 0.1s ease-out; }
+
+/* Custom scrollbar for transcript */
+#transcript::-webkit-scrollbar {
+    width: 6px;
+}
+
+#transcript::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#transcript::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+}
+
+/* Chat bubble animations */
+.msg {
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

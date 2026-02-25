@@ -3,6 +3,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.voice_rag.core.config import settings
 from src.voice_rag.core.auth import get_aws_session
@@ -33,6 +34,9 @@ def create_app() -> FastAPI:
     # Store in app state for route access
     app.state.kb = kb_service
     app.state.orchestrator = orchestrator
+
+    # Mount Static Files
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
     # Include Routes
     app.include_router(ingest.router)

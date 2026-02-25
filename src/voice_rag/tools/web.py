@@ -4,6 +4,7 @@ import boto3
 from ddgs import DDGS
 from strands import tool
 from src.voice_rag.core.config import settings
+from src.voice_rag.core.prompts import get_web_synthesis_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,9 @@ def get_web_search_tool(session: boto3.Session):
 
         try:
             raw_results = await asyncio.to_thread(ddg_sync)
-            context = "
-".join([f"{r['title']}: {r['body']}" for r in raw_results])
+            context = "\n".join([f"{r['title']}: {r['body']}" for r in raw_results])
             
-            prompt = f"Summarize these web results concisely for voice: {context}
-
-Query: {query}"
+            prompt = get_web_synthesis_prompt(context, query)
             
             response = bedrock.converse(
                 modelId=settings.NOVA_LITE_MODEL_ID,

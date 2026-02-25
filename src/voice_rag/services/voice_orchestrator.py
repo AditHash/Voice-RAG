@@ -7,6 +7,7 @@ from strands.experimental.bidi.tools import stop_conversation
 from strands_tools import calculator
 
 from src.voice_rag.core.config import settings
+from src.voice_rag.core.prompts import get_system_prompt
 from src.voice_rag.services.knowledge_base import KnowledgeBaseService
 from src.voice_rag.tools.rag import get_rag_tool
 from src.voice_rag.tools.web import get_web_search_tool
@@ -40,17 +41,6 @@ class VoiceOrchestrator:
 
         return BidiAgent(
             model=model,
-            system_prompt=self._get_system_prompt(),
+            system_prompt=get_system_prompt(self.current_date),
             tools=[calculator, stop_conversation, search_docs, web_search]
         )
-
-    def _get_system_prompt(self) -> str:
-        return f"""You are 'Voice-RAG', an advanced AI assistant.
-        Today's date is {self.current_date}. 
-
-        CRITICAL INSTRUCTIONS:
-        1. PERSPECTIVE: You are an expert researcher. Use your tools for any specific or factual queries.
-        2. ACCESS: You DO have access to uploaded files via 'search_documents'.
-        3. PRIORITY: Search local documents first, then the web.
-        4. BREVITY: Keep voice responses extremely concise (1-2 sentences max).
-        """
