@@ -6,11 +6,11 @@ from strands.experimental.bidi.models import BidiNovaSonicModel
 from strands.experimental.bidi.tools import stop_conversation
 from strands_tools import calculator
 
-from src.voice_rag.core.config import settings
-from src.voice_rag.core.prompts import get_system_prompt
-from src.voice_rag.services.knowledge_base import KnowledgeBaseService
-from src.voice_rag.tools.rag import get_rag_tool
-from src.voice_rag.tools.web import get_web_search_tool
+from src.core.config import settings
+from src.core.prompts import get_system_prompt
+from src.services.knowledge_base import KnowledgeBaseService
+from src.tools.rag import get_rag_tool
+from src.tools.web import get_web_search_tool
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Request
-from src.voice_rag.services.knowledge_base import KnowledgeBaseService
+from src.services.knowledge_base import KnowledgeBaseService
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 

@@ -7,7 +7,7 @@ import fitz
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from chromadb.utils.embedding_functions import EmbeddingFunction
-from src.voice_rag.core.config import settings
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 

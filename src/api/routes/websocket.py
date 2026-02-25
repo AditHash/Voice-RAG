@@ -7,8 +7,8 @@ from strands.experimental.bidi import (
     BidiTranscriptStreamEvent, BidiAudioStreamEvent, 
     BidiInterruptionEvent, BidiAudioInputEvent, ToolUseStreamEvent
 )
-from src.voice_rag.core.config import settings
-from src.voice_rag.services.voice_orchestrator import VoiceOrchestrator
+from src.core.config import settings
+from src.services.voice_orchestrator import VoiceOrchestrator
 
 router = APIRouter(tags=["voice"])
 logger = logging.getLogger(__name__)

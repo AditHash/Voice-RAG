@@ -5,11 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.voice_rag.core.config import settings
-from src.voice_rag.core.auth import get_aws_session
-from src.voice_rag.services.knowledge_base import KnowledgeBaseService
-from src.voice_rag.services.voice_orchestrator import VoiceOrchestrator
-from src.voice_rag.api.routes import ingest, websocket
+from src.core.config import settings
+from src.core.auth import get_aws_session
+from src.services.knowledge_base import KnowledgeBaseService
+from src.services.voice_orchestrator import VoiceOrchestrator
+from src.api.routes import ingest, websocket
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

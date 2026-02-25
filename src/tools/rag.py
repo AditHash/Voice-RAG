@@ -1,9 +1,9 @@
 import logging
 import boto3
 from strands import tool
-from src.voice_rag.services.knowledge_base import KnowledgeBaseService
-from src.voice_rag.core.config import settings
-from src.voice_rag.core.prompts import get_rag_synthesis_prompt
+from src.services.knowledge_base import KnowledgeBaseService
+from src.core.config import settings
+from src.core.prompts import get_rag_synthesis_prompt
 
 logger = logging.getLogger(__name__)
 

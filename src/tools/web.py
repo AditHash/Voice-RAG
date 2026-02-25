@@ -3,8 +3,8 @@ import asyncio
 import boto3
 from ddgs import DDGS
 from strands import tool
-from src.voice_rag.core.config import settings
-from src.voice_rag.core.prompts import get_web_synthesis_prompt
+from src.core.config import settings
+from src.core.prompts import get_web_synthesis_prompt
 
 logger = logging.getLogger(__name__)
 

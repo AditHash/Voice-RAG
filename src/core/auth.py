@@ -1,7 +1,7 @@
 import os
 import boto3
 import logging
-from src.voice_rag.core.config import settings
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
