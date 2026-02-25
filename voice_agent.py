@@ -1,6 +1,7 @@
 import logging
 import boto3
 import json
+from strands import tool
 from strands.experimental.bidi import BidiAgent
 from strands.experimental.bidi.models import BidiNovaSonicModel
 from strands.experimental.bidi.tools import stop_conversation
@@ -13,18 +14,15 @@ logger = logging.getLogger(__name__)
 def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     """Initialize a fresh BidiAgent with tools and knowledge retrieval capabilities."""
     
-    # Define the search tool for the knowledge base
+    @tool(description="Search the internal knowledge base for specific information, company documents, or technical info.")
     async def search_knowledge_base(query: str) -> str:
-        """Search the internal knowledge base for specific information, company documents, or technical info."""
         logger.info(f"Agent tool: Searching knowledge base with query: {query}")
         return kb.retrieve(query)
 
-    # Define a free web search tool using Wikipedia API via http_request
+    @tool(description="Search Wikipedia for general knowledge, historical facts, or technical concepts when the user asks to search the web.")
     async def web_search(query: str) -> str:
-        """Search Wikipedia for general knowledge, historical facts, or technical concepts when the user asks to search the web."""
         logger.info(f"Agent tool: Searching Wikipedia for: {query}")
         
-        # We use http_request to call the Wikipedia API
         params = {
             "action": "query",
             "format": "json",
@@ -36,7 +34,6 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
         }
         
         try:
-            # http_request tool expects (url, method, params, headers, etc.)
             response_str = await http_request(
                 url="https://en.wikipedia.org/w/api.php",
                 method="GET",
@@ -47,13 +44,12 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
             if not pages:
                 return f"No Wikipedia results found for '{query}'."
             
-            # Extract the first page result
             page_id = next(iter(pages))
             if page_id == "-1":
                 return f"No Wikipedia results found for '{query}'."
             
             extract = pages[page_id].get("extract", "")
-            return extract[:800] # Return first 800 chars for voice brevity
+            return extract[:800]
         except Exception as e:
             logger.error(f"Wikipedia search failed: {e}")
             return "Web search failed. Please try again later."
