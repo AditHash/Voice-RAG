@@ -50,7 +50,15 @@ async def voice_websocket(websocket: WebSocket):
 
                 elif isinstance(event, ToolUseStreamEvent):
                     tool_name = event.get("current_tool_use", {}).get("name", "tool")
-                    await websocket.send_text(json.dumps({"event": {"statusUpdate": f"Using {tool_name}..."}}))
+                    # Send a structured event to frontend for better handling
+                    await websocket.send_text(json.dumps({
+                        "event": {
+                            "toolEvent": {
+                                "name": tool_name,
+                                "status": "started" # Can be extended to "progress", "completed", "error"
+                            }
+                        }
+                    }))
 
         except Exception as e:
             logger.error(f"Agent receiver error: {e}")
