@@ -5,7 +5,7 @@ import json
 import base64
 import boto3
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
@@ -20,6 +20,9 @@ from strands.experimental.bidi import (
 from strands.experimental.bidi.models import BidiNovaSonicModel
 from strands.experimental.bidi.tools import stop_conversation
 from strands_tools import calculator
+
+# Import RAG Manager
+from rag_manager import RAGManager, create_retrieval_tool
 
 # Initialize environment and logging
 load_dotenv()
@@ -55,6 +58,24 @@ session = boto3.Session(
     region_name=region
 )
 
+# Initialize RAG Manager
+rag_manager = RAGManager(session, region)
+search_tool = create_retrieval_tool(rag_manager)
+
+@app.post("/ingest")
+async def ingest_document(file: UploadFile = File(...)):
+    """API to ingest documents into the Knowledge Base."""
+    content = await file.read()
+    text = content.decode("utf-8")
+    num_chunks = rag_manager.ingest_text(text, {"filename": file.filename})
+    return {"status": "success", "chunks_ingested": num_chunks}
+
+@app.post("/retrieve")
+async def retrieve_info(query: str):
+    """Diagnostic API to search the Knowledge Base manually."""
+    context = rag_manager.retrieve(query)
+    return {"query": query, "context": context}
+
 @app.get("/", response_class=HTMLResponse)
 async def get_ui():
     """Serve the single-page web UI."""
@@ -67,7 +88,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     
     # Initialize a fresh model instance for THIS specific connection
-    # This prevents "model already started" errors when multiple users connect
     connection_model = BidiNovaSonicModel(
         model_id="amazon.nova-2-sonic-v1:0",
         provider_config={
@@ -82,10 +102,15 @@ async def websocket_endpoint(websocket: WebSocket):
     )
 
     # Each connection gets its own BidiAgent instance
+    # search_tool allows the agent to intelligently query the knowledge base
     agent = BidiAgent(
         model=connection_model,
-        system_prompt="You are a friendly and professional voice assistant. Keep your responses concise and natural for a real-time conversation.",
-        tools=[calculator, stop_conversation]
+        system_prompt="""You are a professional and helpful voice assistant for Voice-RAG. 
+        You have access to an internal knowledge base. 
+        If a user asks a question about company documents, technical info, or specific policies, use the 'search_knowledge_base' tool. 
+        Keep your responses concise and conversational for real-time audio.
+        """,
+        tools=[calculator, stop_conversation, search_tool]
     )
 
     await agent.start()
