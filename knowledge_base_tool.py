@@ -7,9 +7,9 @@ logger = logging.getLogger(__name__)
 def get_knowledge_base_tool(kb: KnowledgeBase):
     """Factory to create the RAG search tool for the BidiAgent."""
     
-    @tool(description="Search the internal knowledge base for specific information, company documents, or technical info.")
-    async def search_knowledge_base(query: str) -> str:
-        logger.info(f"Tool: Searching local knowledge base for '{query}'")
+    @tool(name="search_documents", description="MANDATORY tool to use when the user asks about uploaded files, PDFs, 'this document', or any specific info that might be in a document.")
+    async def search_documents(query: str) -> str:
+        logger.info(f"Tool: Searching documents for '{query}'")
         return kb.retrieve(query)
         
-    return search_knowledge_base
+    return search_documents

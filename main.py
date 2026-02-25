@@ -124,7 +124,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Event inherits from dict, access keys directly
                     tool_name = event.get("current_tool_use", {}).get("name", "tool")
                     status_map = {
-                        "search_knowledge_base": "Searching Knowledge Base...",
+                        "search_documents": "Searching Knowledge Base...",
                         "web_search_tool": "Searching the web...",
                         "calculator": "Performing calculation..."
                     }

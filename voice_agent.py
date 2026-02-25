@@ -20,7 +20,7 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     current_date = datetime.now().strftime("%A, %B %d, %Y")
     
     # Initialize tools
-    search_knowledge_base = get_knowledge_base_tool(kb)
+    search_documents = get_knowledge_base_tool(kb)
 
     # Initialize the Nova Sonic model
     model = BidiNovaSonicModel(
@@ -36,20 +36,24 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
         }
     )
 
-    # Assemble the BidiAgent with specific instructions for the tools
+    # Assemble the BidiAgent with extremely strict tool-use instructions
     agent = BidiAgent(
         model=model,
-        system_prompt=f"""You are 'Voice-RAG', a highly intelligent and proactive voice assistant.
+        system_prompt=f"""You are 'Voice-RAG', a highly intelligent AI assistant with access to a local knowledge base.
         Today's date is {current_date}. 
+
+        CRITICAL INSTRUCTIONS:
+        1. YOU HAVE ACCESS TO FILES: If the user says "what is this pdf", "tell me about the document", "what did I upload", or any question about specific content, YOU MUST CALL the 'search_documents' tool.
+        2. NEVER SAY "I don't have access to your files". You DO have access through the 'search_documents' tool.
+        3. AUTOMATIC SEARCH: If the user asks a question and you don't know the answer, search the knowledge base first, then search the web.
+        4. WEB SEARCH: Use 'web_search_tool' only for real-time news, current events, or general knowledge NOT in the uploaded files.
+        5. CONCISENESS: Since this is a voice interaction, be extremely brief.
         
-        CORE INSTRUCTIONS:
-        1. PERSPECTIVE: You are an expert researcher. If you don't know something, use your tools. 
-        2. RAG FIRST: For any questions about documents or specific personal/company info, use 'search_knowledge_base'.
-        3. WEB SECOND: For real-time news, upcoming events, or general knowledge, use 'web_search_tool'.
-        4. REASONING: Synthesize the information from your tools into a concise response.
-        5. CONCISENESS: Be extremely brief and get to the point quickly for voice interaction.
+        Example:
+        User: "What is this PDF?"
+        Action: Call 'search_documents' with query "summary of the document"
         """,
-        tools=[calculator, stop_conversation, search_knowledge_base, web_search_tool]
+        tools=[calculator, stop_conversation, search_documents, web_search_tool]
     )
     
     return agent
