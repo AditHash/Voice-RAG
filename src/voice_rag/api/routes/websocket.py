@@ -40,7 +40,13 @@ async def voice_websocket(websocket: WebSocket):
                         current_bot_text = ""
 
                 elif isinstance(event, BidiAudioStreamEvent) and event.audio:
-                    await websocket.send_bytes(base64.b64decode(event.audio))
+                    audio_data = base64.b64decode(event.audio)
+                    # Relay in small chunks to prevent browser buffering/stuttering
+                    chunk_size = 512
+                    for i in range(0, len(audio_data), chunk_size):
+                        await websocket.send_bytes(audio_data[i:i+chunk_size])
+                        # Tiny yield to allow the event loop to breathe
+                        await asyncio.sleep(0.001)
 
                 elif isinstance(event, ToolUseStreamEvent):
                     tool_name = event.get("current_tool_use", {}).get("name", "tool")
@@ -68,4 +74,4 @@ async def voice_websocket(websocket: WebSocket):
     finally:
         await agent.stop()
         receiver_task.cancel()
-        kb.clear_all() # Reset KB on disconnect as per mandate
+        logger.info("Voice session ended")
