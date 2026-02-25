@@ -1,7 +1,8 @@
 import logging
 import boto3
 import json
-from duckduckgo_search import DDGS
+import asyncio
+from ddgs import DDGS
 from strands import tool
 from strands.experimental.bidi import BidiAgent
 from strands.experimental.bidi.models import BidiNovaSonicModel
@@ -24,17 +25,22 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     async def web_search(query: str) -> str:
         """Perform a full web search using DuckDuckGo."""
         logger.info(f"Agent tool: Searching the web for: {query}")
-        try:
-            results = []
+        
+        def run_search():
             with DDGS() as ddgs:
-                # Fetch top 5 results
-                for r in ddgs.text(query, max_results=5):
-                    results.append(f"Title: {r['title']}\nSnippet: {r['body']}\nSource: {r['href']}")
+                return ddgs.text(query, max_results=5)
+
+        try:
+            # Run the synchronous search in a thread to avoid blocking the voice stream
+            search_results = await asyncio.to_thread(run_search)
+            
+            results = []
+            for r in search_results:
+                results.append(f"Title: {r['title']}\nSnippet: {r['body']}\nSource: {r['href']}")
             
             if not results:
                 return f"No web search results found for '{query}'."
             
-            # Combine results and truncate for voice context
             combined_results = "\n\n".join(results)
             return combined_results[:1500] 
         except Exception as e:
