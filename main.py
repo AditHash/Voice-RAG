@@ -121,7 +121,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_bytes(audio_bytes)
                 elif isinstance(event, ToolUseStreamEvent):
                     # Notify frontend that the agent is using a tool
-                    tool_name = event.current_tool_use.get("name", "tool")
+                    # Event inherits from dict, access keys directly
+                    tool_name = event.get("current_tool_use", {}).get("name", "tool")
                     status_map = {
                         "search_knowledge_base": "Searching Knowledge Base...",
                         "web_search": "Searching Wikipedia...",
