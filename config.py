@@ -15,6 +15,7 @@ class Config:
 
     # Bedrock Models
     NOVA_SONIC_MODEL_ID = "amazon.nova-2-sonic-v1:0"
+    NOVA_LITE_MODEL_ID = "amazon.nova-lite-v1:0"
     TITAN_EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
     
     # Audio Configuration
