@@ -25,33 +25,30 @@ from config import Config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load the Bedrock API key (for standard models)
-api_key = os.getenv("BEDROCK_API_KEY") or os.getenv("BEDRCOK_API_KEY")
-if api_key:
-    os.environ['AWS_BEARER_TOKEN_BEDROCK'] = api_key
+# --- Universal Authentication Resolver ---
+# This ensures it works with 1) Bedrock API Key, 2) SigV4 Keys, or 3) AWS SSO Sessions
 
-# Clear SSO profiles to prevent boto3 refresh crashes
-os.environ.pop("AWS_PROFILE", None)
-os.environ.pop("AWS_DEFAULT_PROFILE", None)
+if Config.BEDROCK_API_KEY:
+    # Set it as a bearer token for Bedrock clients (e.g. Converse, Embeddings)
+    os.environ['AWS_BEARER_TOKEN_BEDROCK'] = Config.BEDROCK_API_KEY
+    logger.info("Auth: Found BEDROCK_API_KEY. Configured as Bearer Token.")
 
-app = FastAPI()
+# If we have keys in the .env, we clear SSO profile to avoid refresh crashes
+if Config.AWS_ACCESS_KEY_ID and Config.AWS_SECRET_ACCESS_KEY:
+    os.environ.pop("AWS_PROFILE", None)
+    os.environ.pop("AWS_DEFAULT_PROFILE", None)
+    logger.info("Auth: Found SigV4 keys in environment. Prioritizing over SSO profiles.")
 
-# Add CORS middleware to allow all origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Initialize the AWS Session (Requires SigV4)
+# Initialize the AWS Session with available credentials
 session = boto3.Session(
     aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
     aws_session_token=Config.AWS_SESSION_TOKEN,
     region_name=Config.AWS_REGION
 )
+# --- End of Auth Resolver ---
+
+app = FastAPI()
 
 # Initialize Knowledge Base
 kb = KnowledgeBase(session, Config.AWS_REGION)
