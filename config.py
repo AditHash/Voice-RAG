@@ -13,9 +13,6 @@ class Config:
     # Bedrock API Key (Bearer Token)
     BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY") or os.getenv("BEDRCOK_API_KEY")
 
-    # Search Configuration
-    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-    
     # Bedrock Models
     NOVA_SONIC_MODEL_ID = "amazon.nova-2-sonic-v1:0"
     TITAN_EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
