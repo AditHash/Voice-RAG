@@ -10,6 +10,9 @@ class Config:
     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
     AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
     
+    # Bedrock API Key (Bearer Token)
+    BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY") or os.getenv("BEDRCOK_API_KEY")
+    
     # Bedrock Models
     NOVA_SONIC_MODEL_ID = "amazon.nova-2-sonic-v1:0"
     TITAN_EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
@@ -28,4 +31,5 @@ class Config:
     
     # Server Configuration
     HOST = "127.0.0.1"
-    PORT = 8001
+    PORT = 8000
+    DEBUG = True
