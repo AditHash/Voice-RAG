@@ -13,7 +13,8 @@ from strands.experimental.bidi import (
     BidiTranscriptStreamEvent,
     BidiAudioStreamEvent,
     BidiInterruptionEvent,
-    BidiAudioInputEvent
+    BidiAudioInputEvent,
+    ToolUseStreamEvent
 )
 
 # Import local modules
@@ -107,6 +108,20 @@ async def websocket_endpoint(websocket: WebSocket):
                     if event.audio:
                         audio_bytes = base64.b64decode(event.audio)
                         await websocket.send_bytes(audio_bytes)
+                elif isinstance(event, ToolUseStreamEvent):
+                    # Notify frontend that the agent is using a tool
+                    tool_name = event.current_tool_use.get("name", "tool")
+                    status_map = {
+                        "search_knowledge_base": "Searching Knowledge Base...",
+                        "web_search": "Searching Wikipedia...",
+                        "calculator": "Performing calculation..."
+                    }
+                    display_status = status_map.get(tool_name, f"Using {tool_name}...")
+                    await websocket.send_text(json.dumps({
+                        "event": {
+                            "statusUpdate": display_status
+                        }
+                    }))
                 elif isinstance(event, BidiInterruptionEvent):
                     logger.info("User interrupted assistant")
         except Exception as e:
