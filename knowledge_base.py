@@ -6,14 +6,15 @@ import chromadb
 import fitz  # PyMuPDF
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 class BedrockEmbeddingFunction:
     """Custom embedding function for ChromaDB using AWS Bedrock Titan V2."""
-    def __init__(self, session: boto3.Session, region_name: str = "us-east-1"):
+    def __init__(self, session: boto3.Session, region_name: str = Config.AWS_REGION):
         self.client = session.client("bedrock-runtime", region_name=region_name)
-        self.model_id = "amazon.titan-embed-text-v2:0"
+        self.model_id = Config.TITAN_EMBED_MODEL_ID
 
     def __call__(self, input: List[str]) -> List[List[float]]:
         embeddings = []
@@ -29,22 +30,21 @@ class BedrockEmbeddingFunction:
                 embeddings.append(response_body.get("embedding"))
             except Exception as e:
                 logger.error(f"Error generating embedding: {e}")
-                embeddings.append([0.0] * 1024) # Fallback dimension for Titan v2
+                embeddings.append([0.0] * 1024)
         return embeddings
 
 class KnowledgeBase:
     """Handles the Vector Database (ChromaDB), Embeddings, and Document Ingestion."""
-    def __init__(self, session: boto3.Session, region_name: str = "us-east-1"):
+    def __init__(self, session: boto3.Session, region_name: str = Config.AWS_REGION):
         self.embedding_fn = BedrockEmbeddingFunction(session, region_name)
-        # Persistent storage in 'chroma_db' folder
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        self.chroma_client = chromadb.PersistentClient(path=Config.CHROMA_DB_PATH)
         self.collection = self.chroma_client.get_or_create_collection(
-            name="voice_rag_knowledge",
+            name=Config.COLLECTION_NAME,
             embedding_function=self.embedding_fn
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
+            chunk_size=Config.CHUNK_SIZE,
+            chunk_overlap=Config.CHUNK_OVERLAP
         )
 
     def ingest_text(self, text: str, metadata: Dict[str, Any] = None):
