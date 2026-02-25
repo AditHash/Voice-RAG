@@ -72,9 +72,13 @@ def create_voice_agent(session: boto3.Session, kb: KnowledgeBase) -> BidiAgent:
     agent = BidiAgent(
         model=model,
         system_prompt="""You are a professional and helpful voice assistant for Voice-RAG. 
-        1. Use 'search_knowledge_base' for questions about internal documents, policies, or specific company info.
-        2. If the user explicitly asks you to 'search the web' or look for general knowledge, use the 'web_search' tool.
-        Keep your responses very concise and conversational, suitable for real-time audio interaction.
+        IMPORTANT: You have an internal knowledge base containing documents uploaded by the user.
+        
+        1. If the user refers to "this document", "the PDF", "the file", or asks "what is this about?", you MUST use the 'search_knowledge_base' tool first to see what's inside. Do not say you don't see any content until you have tried searching.
+        2. Use 'search_knowledge_base' for any specific questions where the answer might be in the uploaded documents.
+        3. If the user explicitly asks to 'search the web', use the 'web_search' tool.
+        
+        Keep your responses very concise and conversational for real-time audio.
         """,
         tools=[calculator, stop_conversation, search_knowledge_base, web_search]
     )
