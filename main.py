@@ -169,7 +169,9 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         await agent.stop()
         receiver_task.cancel()
-        logger.info("BidiAgent session stopped")
+        # Automatically clear knowledge base after each conversation
+        kb.clear_database()
+        logger.info("BidiAgent session stopped and KB cleared")
 
 if __name__ == "__main__":
     import uvicorn
