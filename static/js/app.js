@@ -1,7 +1,10 @@
-/* Voice-RAG Frontend Logic */
+/* Voice-RAG Frontend Logic for Chat UI */
 
 const startBtn = document.getElementById('startBtn');
 const btnText = document.getElementById('btnText');
+const micIcon = document.getElementById('micIcon');
+const sendIcon = document.getElementById('sendIcon');
+const textInput = document.getElementById('textInput');
 const status = document.getElementById('status');
 const connStatus = document.getElementById('connStatus');
 const connIndicator = document.getElementById('connIndicator');
@@ -10,12 +13,54 @@ const visualizer = document.getElementById('visualizer');
 const fileInput = document.getElementById('fileInput');
 const uploadStatus = document.getElementById('uploadStatus');
 const resetBtn = document.getElementById('resetBtn');
+const documentListDiv = document.getElementById('documentList'); // New element
 
 // State
 let ws;
 let audioCtx;
 let nextStartTime = 0;
 let activeSources = [];
+let isRecording = false;
+let isBusy = false; // New busy state flag
+let audioStream;
+
+// Helper to manage busy state
+function setBusy(busy) {
+    isBusy = busy;
+    startBtn.disabled = busy;
+    textInput.disabled = busy;
+    fileInput.disabled = busy;
+    resetBtn.disabled = busy;
+    if (busy) {
+        status.innerText = "Processing...";
+        startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        status.innerText = "Ready to converse";
+        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+// Helper to load document list
+async function loadDocumentList() {
+    try {
+        const res = await fetch('/api/knowledge/list');
+        const data = await res.json();
+        documentListDiv.innerHTML = '';
+        if (data.documents && data.documents.length > 0) {
+            data.documents.forEach(doc => {
+                const li = document.createElement('li');
+                li.className = 'text-sm text-slate-400';
+                li.innerText = `${doc.filename} (${doc.chunks} chunks)`;
+                documentListDiv.appendChild(li);
+            });
+        } else {
+            documentListDiv.innerHTML = '<li class="text-sm text-slate-500 italic">No documents uploaded.</li>';
+        }
+    } catch (err) {
+        console.error("Failed to load document list:", err);
+        documentListDiv.innerHTML = '<li class="text-sm text-rose-400 italic">Failed to load docs.</li>';
+    }
+}
 
 // Initialize Visualizer
 for(let i=0; i<32; i++) {
@@ -24,18 +69,27 @@ for(let i=0; i<32; i++) {
     visualizer.appendChild(bar);
 }
 
+// Initial load of documents
+loadDocumentList();
+
 // Reset Logic
 resetBtn.onclick = async () => {
     if (!confirm("Clear all uploaded documents?")) return;
+    setBusy(true);
     try {
         const res = await fetch('/api/knowledge/reset', { method: 'POST' });
         const data = await res.json();
         if (data.status === 'success') {
-            uploadStatus.className = "mt-4 text-[11px] font-medium text-emerald-400 uppercase tracking-wider";
+            uploadStatus.className = "text-sm text-emerald-400";
             uploadStatus.innerText = "Knowledge Base Cleared";
+            await loadDocumentList(); // Refresh list
         }
     } catch (err) {
         console.error("Reset failed", err);
+        uploadStatus.className = "text-sm text-rose-400";
+        uploadStatus.innerText = "Reset failed";
+    } finally {
+        setBusy(false);
     }
 };
 
@@ -44,7 +98,8 @@ fileInput.onchange = async () => {
     const file = fileInput.files[0];
     if (!file) return;
 
-    uploadStatus.className = "mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider";
+    setBusy(true);
+    uploadStatus.className = "text-sm text-sky-400";
     uploadStatus.innerText = "Ingesting " + file.name + "...";
     const formData = new FormData();
     formData.append('file', file);
@@ -55,32 +110,40 @@ fileInput.onchange = async () => {
         if (data.status === 'success') {
             uploadStatus.classList.replace('text-sky-400', 'text-emerald-400');
             uploadStatus.innerText = "Done! " + data.chunks + " chunks added.";
+            await loadDocumentList(); // Refresh list
         } else {
             throw new Error();
         }
     } catch (err) {
         uploadStatus.classList.replace('text-sky-400', 'text-rose-400');
         uploadStatus.innerText = "Upload failed";
+    } finally {
+        setBusy(false);
     }
 };
 
 // Chat Helpers
 function addMessage(text, role) {
-    if (transcript.querySelector('.italic')) transcript.innerHTML = '';
+    if (transcript.querySelector('.msg-bubble').innerText === "Hello! I'm Voice-RAG, your intelligent assistant. How can I help you today?") {
+        transcript.innerHTML = ''; // Clear initial bot message
+    }
 
     let msgDiv;
     if (role === 'bot' && transcript.lastElementChild?.dataset.role === 'bot-active') {
-        msgDiv = transcript.lastElementChild;
+        msgDiv = transcript.lastElementChild.querySelector('.msg-bubble');
+        msgDiv.innerText = text; // Update current bot message
     } else {
         msgDiv = document.createElement('div');
-        msgDiv.className = role === 'bot' 
-            ? 'msg self-start bg-slate-800 text-sky-100 px-5 py-3 rounded-2xl rounded-bl-none max-w-[85%] border border-slate-700/50 shadow-sm'
-            : 'msg self-end bg-sky-500 text-slate-950 font-semibold px-5 py-3 rounded-2xl rounded-br-none max-w-[85%] shadow-lg shadow-sky-500/10';
+        msgDiv.className = role === 'bot' ? 'msg bot-msg' : 'msg user-msg';
         
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.innerText = text;
+        msgDiv.appendChild(bubble);
+
         if (role === 'bot') msgDiv.dataset.role = 'bot-active';
         transcript.appendChild(msgDiv);
     }
-    msgDiv.innerText = text;
     transcript.scrollTop = transcript.scrollHeight;
 }
 
@@ -94,11 +157,20 @@ function stopPlayback() {
 
 // WebSocket Setup
 startBtn.onclick = async () => {
-    if (ws) { location.reload(); return; }
+    if (isBusy) return; // Prevent interaction if busy
 
+    if (isRecording) { // Stop recording / end session
+        if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+        if (ws) ws.close();
+        location.reload(); // Simple refresh to reset state
+        return;
+    }
+
+    // Start recording / start session
+    setBusy(true); // Set busy during connection establishment
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${location.host}/ws`);
@@ -114,7 +186,11 @@ startBtn.onclick = async () => {
             startBtn.classList.replace('bg-sky-500', 'bg-rose-500');
             startBtn.classList.replace('hover:bg-sky-400', 'hover:bg-rose-400');
             startBtn.classList.replace('shadow-sky-500/25', 'shadow-rose-500/25');
-            startRecording(stream);
+            isRecording = true;
+            micIcon.classList.remove('hidden');
+            sendIcon.classList.add('hidden');
+            setBusy(false); // Clear busy state once connected
+            startRecording(audioStream);
         };
 
         ws.onmessage = async (e) => {
@@ -129,6 +205,15 @@ startBtn.onclick = async () => {
                     addMessage(data.event.userTranscript, 'user');
                 } else if (data.event?.statusUpdate) {
                     status.innerText = data.event.statusUpdate;
+                } else if (data.event?.toolEvent) {
+                    const toolName = data.event.toolEvent.name;
+                    const toolStatus = data.event.toolEvent.status;
+                    const statusMap = {
+                        "search_documents": "Searching Knowledge Base...",
+                        "web_search": "Searching the web...",
+                        "calculator": "Performing calculation..."
+                    };
+                    status.innerText = statusMap[toolName] || `Agent using ${toolName}...`;
                 }
             } else {
                 playOutputAudio(e.data);
@@ -139,8 +224,37 @@ startBtn.onclick = async () => {
 
     } catch (err) {
         alert("Microphone access denied or error: " + err.message);
+        console.error(err);
+        setBusy(false); // Clear busy state on error
     }
 };
+
+// Text Input Handling
+textInput.onkeypress = async (e) => {
+    if (isBusy) return; // Prevent interaction if busy
+    if (e.key === 'Enter' && textInput.value.trim() !== '' && ws && ws.readyState === WebSocket.OPEN) {
+        const message = textInput.value.trim();
+        addMessage(message, 'user');
+        ws.send(message);
+        textInput.value = '';
+        status.innerText = "Sending message...";
+        stopPlayback();
+        document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
+    }
+};
+
+// Toggle Send/Mic Button based on input
+textInput.oninput = () => {
+    if (isBusy) return; // Prevent interaction if busy
+    if (textInput.value.trim() !== '') {
+        micIcon.classList.add('hidden');
+        sendIcon.classList.remove('hidden');
+    } else {
+        micIcon.classList.remove('hidden');
+        sendIcon.classList.add('hidden');
+    }
+};
+
 
 function startRecording(stream) {
     const source = audioCtx.createMediaStreamSource(stream);
