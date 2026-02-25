@@ -3,65 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice-RAG | Nova Sonic AI</title>
+    <title>Voice-RAG | Dashboard</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .container { background: #1e1e1e; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 400px; }
-        #status { margin-bottom: 1rem; color: #888; }
-        #transcript { margin-top: 1.5rem; height: 100px; overflow-y: auto; text-align: left; background: #2a2a2a; padding: 10px; border-radius: 5px; font-size: 0.9rem; }
-        button { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 1rem; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #444; cursor: not-allowed; }
-        .visualizer { display: flex; align-items: center; justify-content: center; height: 50px; gap: 3px; margin: 20px 0; }
-        .bar { width: 4px; height: 10px; background: #007bff; transition: 0.1s; }
+        :root {
+            --bg-dark: #0f172a;
+            --panel-dark: #1e293b;
+            --accent: #38bdf8;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            background: var(--bg-dark); 
+            color: var(--text-main); 
+            display: flex; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 300px;
+            background: var(--panel-dark);
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .sidebar h2 { font-size: 1.25rem; margin-top: 0; color: var(--accent); }
+        .sidebar p { font-size: 0.875rem; color: var(--text-dim); line-height: 1.5; }
+
+        .upload-zone {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border: 2px dashed #475569;
+            border-radius: 12px;
+            text-align: center;
+            transition: 0.3s;
+        }
+        .upload-zone:hover { border-color: var(--accent); }
+        
+        #fileInput { display: none; }
+        .upload-btn {
+            display: inline-block;
+            background: var(--accent);
+            color: var(--bg-dark);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Main Content Styling */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 80px;
+            gap: 4px;
+            margin-bottom: 2rem;
+        }
+        .bar { width: 6px; height: 10px; background: var(--accent); border-radius: 3px; transition: 0.1s; }
+
+        #status { font-size: 1rem; color: var(--text-dim); margin-bottom: 2rem; height: 1.5rem; font-weight: 500; }
+        
+        #startBtn {
+            background: var(--accent);
+            color: var(--bg-dark);
+            border: none;
+            padding: 1.25rem 2.5rem;
+            border-radius: 50px;
+            font-size: 1.125rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+        }
+        #startBtn.active { background: var(--danger); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+
+        #transcript {
+            margin-top: 3rem;
+            width: 100%;
+            max-width: 600px;
+            background: rgba(30, 41, 59, 0.5);
+            padding: 1.5rem;
+            border-radius: 16px;
+            height: 120px;
+            overflow-y: auto;
+            font-size: 1.125rem;
+            line-height: 1.6;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        .upload-status { font-size: 0.75rem; margin-top: 1rem; color: var(--accent); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Voice-RAG</h1>
-        <div id="status">Ready to talk</div>
+    <div class="sidebar">
+        <h2>Voice-RAG</h2>
+        <p>Your intelligent voice companion powered by AWS Nova Sonic and ChromaDB.</p>
+        
+        <div class="upload-zone">
+            <p>Add knowledge to the agent</p>
+            <label for="fileInput" class="upload-btn">Select PDF / Text</label>
+            <input type="file" id="fileInput" accept=".pdf,.txt">
+            <div id="uploadStatus" class="upload-status"></div>
+        </div>
+
+        <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-dim);">
+            Connection: <span id="connStatus" style="color: var(--danger)">Disconnected</span>
+        </div>
+    </div>
+
+    <div class="main-content">
         <div class="visualizer" id="visualizer"></div>
+        <div id="status">Ready to start conversation</div>
+        
         <button id="startBtn">Start Conversation</button>
-        <div id="transcript"></div>
+
+        <div id="transcript">Bot is waiting for your signal...</div>
     </div>
 
     <script>
         const startBtn = document.getElementById('startBtn');
         const status = document.getElementById('status');
+        const connStatus = document.getElementById('connStatus');
         const transcript = document.getElementById('transcript');
         const visualizer = document.getElementById('visualizer');
+        const fileInput = document.getElementById('fileInput');
+        const uploadStatus = document.getElementById('uploadStatus');
         
         // Create visualizer bars
-        for(let i=0; i<20; i++) {
+        for(let i=0; i<30; i++) {
             const bar = document.createElement('div');
             bar.className = 'bar';
             visualizer.appendChild(bar);
         }
 
+        // File Ingestion Logic
+        fileInput.onchange = async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            uploadStatus.innerText = "Ingesting " + file.name + "...";
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/ingest', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    uploadStatus.style.color = 'var(--success)';
+                    uploadStatus.innerText = "Success! " + data.chunks_ingested + " chunks added.";
+                } else {
+                    throw new Error("Ingestion failed");
+                }
+            } catch (err) {
+                uploadStatus.style.color = 'var(--danger)';
+                uploadStatus.innerText = "Error: " + err.message;
+            }
+        };
+
+        // Voice WebSocket Logic
         let ws;
         let audioCtx;
-        let processor;
-        let source;
+        let nextStartTime = 0;
 
         startBtn.onclick = async () => {
             if (ws) {
-                location.reload(); // Simple way to reset
+                location.reload();
                 return;
             }
 
             try {
-                // 1. Initialize Audio Context for Mic (16kHz)
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // 2. Connect WebSocket
                 ws = new WebSocket(`ws://${location.host}/ws`);
                 ws.binaryType = "arraybuffer";
 
                 ws.onopen = () => {
-                    status.innerText = "Connected! Speak now...";
-                    startBtn.innerText = "Stop Conversation";
-                    startBtn.style.background = "#dc3545";
+                    status.innerText = "Listening...";
+                    connStatus.innerText = "Connected";
+                    connStatus.style.color = "var(--success)";
+                    startBtn.innerText = "End Session";
+                    startBtn.classList.add('active');
                     startRecording(stream);
                 };
 
@@ -69,15 +213,19 @@
                     if (typeof e.data === 'string') {
                         const data = JSON.parse(e.data);
                         if (data.event?.textOutput) {
-                            transcript.innerText = "Bot: " + data.event.textOutput.content;
+                            transcript.innerText = data.event.textOutput.content;
+                            status.innerText = "Assistant is speaking...";
+                        } else if (data.event?.statusUpdate) {
+                            status.innerText = data.event.statusUpdate;
                         }
                     } else {
-                        // Playback bot audio (24kHz raw PCM)
                         playOutputAudio(e.data);
                     }
                 };
 
                 ws.onclose = () => {
+                    connStatus.innerText = "Disconnected";
+                    connStatus.style.color = "var(--danger)";
                     status.innerText = "Session Ended";
                     startBtn.disabled = true;
                 };
@@ -89,61 +237,43 @@
         };
 
         function startRecording(stream) {
-            source = audioCtx.createMediaStreamSource(stream);
-            // ScriptProcessor for Int16 conversion
-            processor = audioCtx.createScriptProcessor(512, 1, 1);
-            
+            const source = audioCtx.createMediaStreamSource(stream);
+            const processor = audioCtx.createScriptProcessor(512, 1, 1);
             source.connect(processor);
             processor.connect(audioCtx.destination);
 
             const bars = document.querySelectorAll('.bar');
-
             processor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
-                
-                // Visualization
                 const vol = inputData.reduce((a, b) => a + Math.abs(b), 0) / 512;
-                bars.forEach(b => b.style.height = (10 + vol * 500) + 'px');
+                bars.forEach((b, i) => {
+                    const h = 10 + (vol * 400 * Math.sin(i / 5 + Date.now() / 100));
+                    b.style.height = Math.max(10, h) + 'px';
+                });
 
-                // Convert Float32 to Int16
                 const output = new Int16Array(inputData.length);
                 for (let i = 0; i < inputData.length; i++) {
                     output[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
                 }
-                
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(output.buffer);
-                }
+                if (ws.readyState === WebSocket.OPEN) ws.send(output.buffer);
             };
         }
 
-        // Playback Buffer handling with scheduling to prevent breaking/stuttering
         const playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-        let nextStartTime = 0;
-
         function playOutputAudio(arrayBuffer) {
             const int16 = new Int16Array(arrayBuffer);
             const float32 = new Float32Array(int16.length);
-            for (let i = 0; i < int16.length; i++) {
-                float32[i] = int16[i] / 0x7FFF;
-            }
+            for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x7FFF;
 
             const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
             buffer.getChannelData(0).set(float32);
-            
             const source = playbackCtx.createBufferSource();
             source.buffer = buffer;
             source.connect(playbackCtx.destination);
 
-            // Calculate start time: either now or exactly when the last chunk ends
             const currentTime = playbackCtx.currentTime;
-            if (nextStartTime < currentTime) {
-                // If we've fallen behind, add a tiny buffer (50ms) to start fresh
-                nextStartTime = currentTime + 0.05;
-            }
-
+            if (nextStartTime < currentTime) nextStartTime = currentTime + 0.05;
             source.start(nextStartTime);
-            // Advance the clock by the duration of this chunk
             nextStartTime += buffer.duration;
         }
     </script>
