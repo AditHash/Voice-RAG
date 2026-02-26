@@ -10,73 +10,198 @@ const visualizer = document.getElementById('visualizer');
 const fileInput = document.getElementById('fileInput');
 const uploadStatus = document.getElementById('uploadStatus');
 const resetBtn = document.getElementById('resetBtn');
+const localeSelect = document.getElementById('localeSelect');
+const polyglotToggle = document.getElementById('polyglotToggle');
+const voiceGenderSelect = document.getElementById('voiceGenderSelect');
+const voiceSelect = document.getElementById('voiceSelect');
+const assistantLangSelect = document.getElementById('assistantLangSelect');
+const codeSwitchToggle = document.getElementById('codeSwitchToggle');
+const endpointingSelect = document.getElementById('endpointingSelect');
+const inputRateSelect = document.getElementById('inputRateSelect');
+const outputRateSelect = document.getElementById('outputRateSelect');
+const temperatureRange = document.getElementById('temperatureRange');
+const topPRange = document.getElementById('topPRange');
+const maxTokensInput = document.getElementById('maxTokensInput');
+const themeToggle = document.getElementById('themeToggle');
+
+const THEME_STORAGE_KEY = "voice_rag_theme";
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === "light") root.classList.remove("dark");
+    else root.classList.add("dark");
+}
+
+function initTheme() {
+    try {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === "light" || stored === "dark") applyTheme(stored);
+    } catch (_) {}
+
+    if (themeToggle) {
+        themeToggle.addEventListener("click", () => {
+            const isDark = document.documentElement.classList.contains("dark");
+            const next = isDark ? "light" : "dark";
+            applyTheme(next);
+            try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (_) {}
+        });
+    }
+}
+
+function setUploadStatus(message, tone = "info") {
+    if (!uploadStatus) return;
+    const base = "mt-4 text-[11px] font-medium uppercase tracking-wider";
+    const toneClass =
+        tone === "success" ? "text-emerald-600 dark:text-emerald-400" :
+        tone === "error" ? "text-red-600 dark:text-red-400" :
+        tone === "warn" ? "text-amber-600 dark:text-amber-400" :
+        "text-slate-400 dark:text-zinc-500";
+    uploadStatus.className = `${base} ${toneClass}`;
+    uploadStatus.innerText = message;
+}
 
 // State
 let ws;
 let audioCtx;
 let nextStartTime = 0;
 let activeSources = [];
+let chatId = null;
+let playbackCtx = null;
+let audioQueue = [];
+let queuedBytes = 0;
+let pumpScheduled = false;
+
+const voicesByLocaleGender = {
+    "en-US": { feminine: "tiffany", masculine: "matthew" },
+    "en-GB": { feminine: "amy", masculine: null },
+    "en-AU": { feminine: "olivia", masculine: null },
+    "en-IN": { feminine: "kiara", masculine: "arjun" },
+    "fr-FR": { feminine: "ambre", masculine: "florian" },
+    "it-IT": { feminine: "beatrice", masculine: "lorenzo" },
+    "de-DE": { feminine: "tina", masculine: "lennart" },
+    "es-US": { feminine: "lupe", masculine: "carlos" },
+    "pt-BR": { feminine: "carolina", masculine: "leo" },
+    "hi-IN": { feminine: "kiara", masculine: "arjun" },
+};
+
+const polyglotVoices = { feminine: "tiffany", masculine: "matthew" };
+
+function setVoiceOptions() {
+    const usePolyglot = !!polyglotToggle?.checked;
+    const locale = localeSelect?.value || "en-US";
+    const gender = voiceGenderSelect?.value || "masculine";
+
+    const mapping = usePolyglot ? polyglotVoices : (voicesByLocaleGender[locale] || voicesByLocaleGender["en-US"]);
+    const available = [];
+    if (mapping.feminine) available.push(mapping.feminine);
+    if (mapping.masculine) available.push(mapping.masculine);
+
+    voiceSelect.innerHTML = "";
+    available.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        voiceSelect.appendChild(opt);
+    });
+
+    const desired = mapping[gender] || mapping.feminine || mapping.masculine || available[0];
+    voiceSelect.value = available.includes(desired) ? desired : available[0];
+
+    // If locale has no masculine/feminine option, lock gender accordingly.
+    if (voiceGenderSelect) {
+        const hasFem = !!mapping.feminine;
+        const hasMasc = !!mapping.masculine;
+        if (!hasMasc) {
+            voiceGenderSelect.value = "feminine";
+            voiceGenderSelect.disabled = true;
+        } else if (!hasFem) {
+            voiceGenderSelect.value = "masculine";
+            voiceGenderSelect.disabled = true;
+        } else {
+            voiceGenderSelect.disabled = false;
+        }
+    }
+
+    if (localeSelect) {
+        localeSelect.disabled = usePolyglot;
+    }
+}
+
+// Initialize locale + voice choices
+setVoiceOptions();
+if (localeSelect) localeSelect.onchange = () => setVoiceOptions();
+if (polyglotToggle) polyglotToggle.onchange = () => setVoiceOptions();
+if (voiceGenderSelect) voiceGenderSelect.onchange = () => setVoiceOptions();
+
+// Initialize theme toggle
+initTheme();
 
 // Initialize Visualizer
 for(let i=0; i<32; i++) {
     const bar = document.createElement('div');
-    bar.className = 'bar w-1.5 bg-sky-500 rounded-full h-2 opacity-40';
+    bar.className = 'bar w-1.5 rounded-full h-2 bg-indigo-500/60 dark:bg-indigo-400/70 opacity-30';
     visualizer.appendChild(bar);
 }
 
 // Reset Logic
 resetBtn.onclick = async () => {
+    if (!chatId) {
+        setUploadStatus("Start a chat first", "warn");
+        return;
+    }
     if (!confirm("Clear all uploaded documents?")) return;
     try {
-        const res = await fetch('/api/knowledge/reset', { method: 'POST' });
+        const res = await fetch(`/api/knowledge/reset?chat_id=${encodeURIComponent(chatId)}`, { method: 'POST' });
         const data = await res.json();
         if (data.status === 'success') {
-            uploadStatus.className = "mt-4 text-[11px] font-medium text-emerald-400 uppercase tracking-wider";
-            uploadStatus.innerText = "Knowledge Base Cleared";
+            setUploadStatus("Knowledge Base Cleared", "success");
         }
     } catch (err) {
         console.error("Reset failed", err);
+        setUploadStatus("Reset failed", "error");
     }
 };
 
 // File Ingestion
 fileInput.onchange = async () => {
+    if (!chatId) {
+        setUploadStatus("Start a chat first", "warn");
+        fileInput.value = "";
+        return;
+    }
     const file = fileInput.files[0];
     if (!file) return;
 
-    uploadStatus.className = "mt-4 text-[11px] font-medium text-sky-400 uppercase tracking-wider";
-    uploadStatus.innerText = "Ingesting " + file.name + "...";
+    setUploadStatus("Ingesting " + file.name + "...", "info");
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-        const res = await fetch('/api/knowledge/ingest', { method: 'POST', body: formData });
+        const res = await fetch(`/api/knowledge/ingest?chat_id=${encodeURIComponent(chatId)}`, { method: 'POST', body: formData });
         const data = await res.json();
         if (data.status === 'success') {
-            uploadStatus.classList.replace('text-sky-400', 'text-emerald-400');
-            uploadStatus.innerText = "Done! " + data.chunks + " chunks added.";
+            setUploadStatus("Done! " + data.chunks + " chunks added.", "success");
         } else {
             throw new Error();
         }
     } catch (err) {
-        uploadStatus.classList.replace('text-sky-400', 'text-rose-400');
-        uploadStatus.innerText = "Upload failed";
+        setUploadStatus("Upload failed", "error");
     }
 };
 
 // Chat Helpers
 function addMessage(text, role) {
-    if (transcript.querySelector('.italic')) transcript.innerHTML = '';
+    transcript.querySelector('[data-placeholder="true"]')?.remove();
 
     let msgDiv;
     if (role === 'bot' && transcript.lastElementChild?.dataset.role === 'bot-active') {
         msgDiv = transcript.lastElementChild;
     } else {
         msgDiv = document.createElement('div');
-        msgDiv.className = role === 'bot' 
-            ? 'msg self-start bg-slate-800 text-sky-100 px-5 py-3 rounded-2xl rounded-bl-none max-w-[85%] border border-slate-700/50 shadow-sm'
-            : 'msg self-end bg-sky-500 text-slate-950 font-semibold px-5 py-3 rounded-2xl rounded-br-none max-w-[85%] shadow-lg shadow-sky-500/10';
-        
+        msgDiv.className = role === 'bot'
+            ? 'msg self-start px-5 py-3 rounded-2xl rounded-bl-none max-w-[85%] border shadow-sm backdrop-blur whitespace-pre-wrap break-words bg-white/70 text-slate-900 border-slate-200/80 dark:bg-zinc-900/60 dark:text-zinc-100 dark:border-white/10'
+            : 'msg self-end px-5 py-3 rounded-2xl rounded-br-none max-w-[85%] border shadow-sm whitespace-pre-wrap break-words bg-indigo-600 text-white border-indigo-600/30 dark:bg-indigo-500 dark:border-white/10';
+         
         if (role === 'bot') msgDiv.dataset.role = 'bot-active';
         transcript.appendChild(msgDiv);
     }
@@ -89,7 +214,46 @@ function stopPlayback() {
         try { s.stop(); } catch(e) {}
     });
     activeSources = [];
-    nextStartTime = playbackCtx.currentTime;
+    audioQueue = [];
+    queuedBytes = 0;
+    pumpScheduled = false;
+    if (playbackCtx) nextStartTime = playbackCtx.currentTime;
+}
+
+function schedulePump() {
+    if (pumpScheduled) return;
+    pumpScheduled = true;
+    queueMicrotask(() => {
+        pumpScheduled = false;
+        pumpAudio();
+    });
+}
+
+function pumpAudio() {
+    if (!playbackCtx) return;
+
+    // Aim for ~100ms blocks to reduce overhead and improve smoothness.
+    const bytesPerSample = 2; // int16
+    const targetBlockMs = 100;
+    const targetBytes = Math.max(2048, Math.floor((playbackCtx.sampleRate * (targetBlockMs / 1000)) * bytesPerSample));
+
+    while (queuedBytes >= targetBytes) {
+        const block = new Uint8Array(targetBytes);
+        let offset = 0;
+        while (offset < targetBytes && audioQueue.length) {
+            const head = audioQueue[0];
+            const take = Math.min(head.byteLength, targetBytes - offset);
+            block.set(head.subarray(0, take), offset);
+            offset += take;
+            if (take === head.byteLength) {
+                audioQueue.shift();
+            } else {
+                audioQueue[0] = head.subarray(take);
+            }
+        }
+        queuedBytes -= targetBytes;
+        playOutputAudio(block.buffer);
+    }
 }
 
 // WebSocket Setup
@@ -97,32 +261,57 @@ startBtn.onclick = async () => {
     if (ws) { location.reload(); return; }
 
     try {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const requestedInputRate = parseInt(inputRateSelect.value, 10);
+        const requestedOutputRate = parseInt(outputRateSelect.value, 10);
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: requestedInputRate });
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: requestedOutputRate });
+        nextStartTime = playbackCtx.currentTime;
+
+        const wsParams = new URLSearchParams();
+        wsParams.set('voice', voiceSelect.value);
+        wsParams.set('voice_locale', localeSelect.value);
+        wsParams.set('polyglot', polyglotToggle?.checked ? '1' : '0');
+        wsParams.set('voice_gender', voiceGenderSelect?.value || 'masculine');
+        wsParams.set('assistant_lang', assistantLangSelect?.value || 'auto');
+        wsParams.set('code_switch', codeSwitchToggle?.checked ? '1' : '0');
+        wsParams.set('endpointing', endpointingSelect.value);
+        wsParams.set('input_rate', String(audioCtx.sampleRate));
+        wsParams.set('output_rate', String(requestedOutputRate));
+        wsParams.set('temperature', String(parseFloat(temperatureRange.value)));
+        wsParams.set('top_p', String(parseFloat(topPRange.value)));
+        wsParams.set('max_tokens', String(parseInt(maxTokensInput.value, 10)));
+        wsParams.set('channels', '1');
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${protocol}//${location.host}/ws`);
+        ws = new WebSocket(`${protocol}//${location.host}/ws?${wsParams.toString()}`);
         ws.binaryType = "arraybuffer";
 
         ws.onopen = () => {
             status.innerText = "Listening...";
             connStatus.innerText = "Connected";
-            connStatus.classList.replace('text-slate-400', 'text-emerald-400');
-            connIndicator.classList.replace('bg-red-500', 'bg-emerald-500');
-            connIndicator.classList.add('shadow-emerald-500/50');
+            connStatus.className = "text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest";
+            connIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30";
             btnText.innerText = "End Session";
-            startBtn.classList.replace('bg-sky-500', 'bg-rose-500');
-            startBtn.classList.replace('hover:bg-sky-400', 'hover:bg-rose-400');
-            startBtn.classList.replace('shadow-sky-500/25', 'shadow-rose-500/25');
             startRecording(stream);
         };
 
         ws.onmessage = async (e) => {
             if (typeof e.data === 'string') {
                 const data = JSON.parse(e.data);
+                if (data.event?.chatInit?.chatId) {
+                    chatId = data.event.chatInit.chatId;
+                    setUploadStatus("Chat ID: " + chatId, "info");
+                    return;
+                }
                 if (data.event?.textOutput) {
                     addMessage(data.event.textOutput.content, 'bot');
                     status.innerText = "Assistant is speaking...";
+                    if (data.event.textOutput.isFinal) {
+                        document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
+                        status.innerText = "Listening...";
+                    }
                 } else if (data.event?.userTranscript) {
                     if (data.event.userTranscript.trim().length > 2) stopPlayback();
                     document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
@@ -131,7 +320,11 @@ startBtn.onclick = async () => {
                     status.innerText = data.event.statusUpdate;
                 }
             } else {
-                playOutputAudio(e.data);
+                // Buffer audio and play in larger blocks for smoother output.
+                const chunk = new Uint8Array(e.data);
+                audioQueue.push(chunk);
+                queuedBytes += chunk.byteLength;
+                schedulePump();
             }
         };
 
@@ -167,13 +360,14 @@ function startRecording(stream) {
     };
 }
 
-const playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
 function playOutputAudio(arrayBuffer) {
+    if (!playbackCtx) return;
+    if ((arrayBuffer.byteLength % 2) !== 0) return; // int16 alignment guard
     const int16 = new Int16Array(arrayBuffer);
     const float32 = new Float32Array(int16.length);
     for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x7FFF;
 
-    const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
+    const buffer = playbackCtx.createBuffer(1, float32.length, playbackCtx.sampleRate);
     buffer.getChannelData(0).set(float32);
     const source = playbackCtx.createBufferSource();
     source.buffer = buffer;
