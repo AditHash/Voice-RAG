@@ -29,6 +29,10 @@ class Settings:
     # - "ddgs": only DDGS+Nova Lite synthesis
     WEB_SEARCH_BACKEND: str = os.getenv("WEB_SEARCH_BACKEND", "auto").lower()
     WEB_SEARCH_MAX_SOURCES: int = int(os.getenv("WEB_SEARCH_MAX_SOURCES", "3"))
+
+    # Media uploads (in-memory per chat session)
+    MEDIA_UPLOAD_MAX_MB: int = int(os.getenv("MEDIA_UPLOAD_MAX_MB", "25"))
+    NOVA_MULTIMODAL_MODEL_ID: str = os.getenv("NOVA_MULTIMODAL_MODEL_ID", NOVA_GROUNDING_MODEL_ID)
     
     # Audio
     INPUT_SAMPLE_RATE: int = 16000

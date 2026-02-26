@@ -9,6 +9,8 @@ const transcript = document.getElementById('transcript');
 const visualizer = document.getElementById('visualizer');
 const fileInput = document.getElementById('fileInput');
 const uploadStatus = document.getElementById('uploadStatus');
+const mediaInput = document.getElementById('mediaInput');
+const mediaStatus = document.getElementById('mediaStatus');
 const resetBtn = document.getElementById('resetBtn');
 const localeSelect = document.getElementById('localeSelect');
 const polyglotToggle = document.getElementById('polyglotToggle');
@@ -58,6 +60,18 @@ function setUploadStatus(message, tone = "info") {
         "text-slate-400 dark:text-zinc-500";
     uploadStatus.className = `${base} ${toneClass}`;
     uploadStatus.innerText = message;
+}
+
+function setMediaStatus(message, tone = "info") {
+    if (!mediaStatus) return;
+    const base = "mt-3 text-[11px] font-medium uppercase tracking-wider";
+    const toneClass =
+        tone === "success" ? "text-emerald-600 dark:text-emerald-400" :
+        tone === "error" ? "text-red-600 dark:text-red-400" :
+        tone === "warn" ? "text-amber-600 dark:text-amber-400" :
+        "text-slate-400 dark:text-zinc-500";
+    mediaStatus.className = `${base} ${toneClass}`;
+    mediaStatus.innerText = message;
 }
 
 // State
@@ -188,6 +202,37 @@ fileInput.onchange = async () => {
         setUploadStatus("Upload failed", "error");
     }
 };
+
+// Media Upload (image/video) for multimodal tools
+if (mediaInput) {
+    mediaInput.onchange = async () => {
+        if (!chatId) {
+            setMediaStatus("Start a chat first", "warn");
+            mediaInput.value = "";
+            return;
+        }
+
+        const file = mediaInput.files[0];
+        if (!file) return;
+
+        setMediaStatus("Uploading " + file.name + "...", "info");
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch(`/api/media/upload?chat_id=${encodeURIComponent(chatId)}`, { method: "POST", body: formData });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.detail || "Upload failed");
+            }
+            setMediaStatus("Uploaded: " + data.attachment.filename, "success");
+        } catch (err) {
+            setMediaStatus("Media upload failed", "error");
+        } finally {
+            mediaInput.value = "";
+        }
+    };
+}
 
 // Chat Helpers
 function addMessage(text, role) {

@@ -8,17 +8,20 @@ from strands.experimental.bidi.tools import stop_conversation
 from strands_tools import calculator
 
 from src.core.config import settings
+from src.core.sessions import SessionStore
 from src.core.prompts import get_system_prompt
 from src.services.knowledge_base import KnowledgeBaseService
 from src.tools.rag import get_rag_tool
 from src.tools.web import get_web_search_tool
+from src.tools.multimodal import get_multimodal_tools
 
 logger = logging.getLogger(__name__)
 
 class VoiceOrchestrator:
-    def __init__(self, session: boto3.Session, kb: KnowledgeBaseService):
+    def __init__(self, session: boto3.Session, kb: KnowledgeBaseService, sessions: SessionStore):
         self.session = session
         self.kb = kb
+        self.sessions = sessions
         self.current_date = datetime.now().strftime("%A, %B %d, %Y")
 
     def create_agent(
@@ -40,6 +43,7 @@ class VoiceOrchestrator:
         # Tools initialized with session for Nova Lite reasoning
         search_internal_documents = get_rag_tool(self.kb, self.session, chat_id=chat_id)
         web_search = get_web_search_tool(self.session)
+        multimodal_tools = get_multimodal_tools(self.sessions, self.session, chat_id=chat_id)
 
         audio_config: dict[str, Any] = {
             "voice": voice or settings.VOICE_ID,
@@ -67,5 +71,5 @@ class VoiceOrchestrator:
         return BidiAgent(
             model=model,
             system_prompt=get_system_prompt(self.current_date, assistant_lang=assistant_lang, allow_code_switch=allow_code_switch),
-            tools=[calculator, stop_conversation, search_internal_documents, web_search]
+            tools=[calculator, stop_conversation, search_internal_documents, web_search, *multimodal_tools]
         )

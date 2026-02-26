@@ -10,7 +10,7 @@ from src.core.auth import get_aws_session
 from src.core.sessions import SessionStore
 from src.services.knowledge_base import KnowledgeBaseService
 from src.services.voice_orchestrator import VoiceOrchestrator
-from src.api.routes import ingest, websocket
+from src.api.routes import ingest, websocket, media
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -30,12 +30,13 @@ def create_app() -> FastAPI:
     # Dependency Initialization
     session = get_aws_session()
     kb_service = KnowledgeBaseService(session)
-    orchestrator = VoiceOrchestrator(session, kb_service)
+    sessions = SessionStore()
+    orchestrator = VoiceOrchestrator(session, kb_service, sessions)
 
     # Store in app state for route access
     app.state.kb = kb_service
     app.state.orchestrator = orchestrator
-    app.state.sessions = SessionStore()
+    app.state.sessions = sessions
 
     # Mount Static Files
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     # Include Routes
     app.include_router(ingest.router)
     app.include_router(websocket.router)
+    app.include_router(media.router)
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
