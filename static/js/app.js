@@ -7,10 +7,15 @@ const connStatus = document.getElementById('connStatus');
 const connIndicator = document.getElementById('connIndicator');
 const transcript = document.getElementById('transcript');
 const visualizer = document.getElementById('visualizer');
+const textInput = document.getElementById('textInput');
+const sendTextBtn = document.getElementById('sendTextBtn');
 const fileInput = document.getElementById('fileInput');
 const uploadStatus = document.getElementById('uploadStatus');
+const chatIdDisplay = document.getElementById('chatIdDisplay');
 const mediaInput = document.getElementById('mediaInput');
 const mediaStatus = document.getElementById('mediaStatus');
+const mediaList = document.getElementById('mediaList');
+const clearMediaBtn = document.getElementById('clearMediaBtn');
 const resetBtn = document.getElementById('resetBtn');
 const localeSelect = document.getElementById('localeSelect');
 const polyglotToggle = document.getElementById('polyglotToggle');
@@ -72,6 +77,92 @@ function setMediaStatus(message, tone = "info") {
         "text-slate-400 dark:text-zinc-500";
     mediaStatus.className = `${base} ${toneClass}`;
     mediaStatus.innerText = message;
+}
+
+function setChatIdDisplay(id) {
+    if (!chatIdDisplay) return;
+    chatIdDisplay.textContent = id ? ("Chat: " + id) : "Chat: —";
+}
+
+function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+}
+
+function renderMediaList(items) {
+    if (!mediaList) return;
+    mediaList.innerHTML = "";
+
+    if (!items || items.length === 0) {
+        const li = document.createElement("li");
+        li.className = "text-xs text-slate-400 dark:text-zinc-500";
+        li.textContent = "No media in this chat yet.";
+        mediaList.appendChild(li);
+        return;
+    }
+
+    for (const item of items) {
+        const li = document.createElement("li");
+        li.className = "flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] px-3 py-2";
+
+        const left = document.createElement("div");
+        left.className = "min-w-0";
+
+        const name = document.createElement("div");
+        name.className = "text-xs font-semibold text-slate-700 dark:text-zinc-200 truncate";
+        name.textContent = item.filename || item.id || "attachment";
+
+        const meta = document.createElement("div");
+        meta.className = "text-[10px] font-medium text-slate-400 dark:text-zinc-500 uppercase tracking-wider";
+        meta.textContent = `${item.media_type || "media"} • ${formatBytes(item.bytes)}`;
+
+        left.appendChild(name);
+        left.appendChild(meta);
+
+        li.appendChild(left);
+        mediaList.appendChild(li);
+    }
+}
+
+async function refreshMediaList() {
+    if (!chatId) {
+        renderMediaList([]);
+        return;
+    }
+    try {
+        const res = await fetch(`/api/media/list?chat_id=${encodeURIComponent(chatId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.detail || "Failed to list media");
+        renderMediaList(data.attachments || []);
+    } catch (_) {
+        renderMediaList([]);
+    }
+}
+
+function setManualInputEnabled(enabled) {
+    if (textInput) textInput.disabled = !enabled;
+    if (sendTextBtn) sendTextBtn.disabled = !enabled;
+}
+
+function sendManualText() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        setManualInputEnabled(false);
+        return;
+    }
+    const raw = textInput?.value || "";
+    const text = raw.trim();
+    if (!text) return;
+
+    if (text.length > 2) stopPlayback();
+    document.querySelectorAll('[data-role="bot-active"]').forEach(m => delete m.dataset.role);
+
+    ws.send(text);
+    addMessage(text, "user");
+    if (textInput) textInput.value = "";
 }
 
 // State
@@ -149,6 +240,7 @@ if (voiceGenderSelect) voiceGenderSelect.onchange = () => setVoiceOptions();
 
 // Initialize theme toggle
 initTheme();
+setManualInputEnabled(false);
 
 // Initialize Visualizer
 for(let i=0; i<32; i++) {
@@ -225,13 +317,49 @@ if (mediaInput) {
             if (!res.ok) {
                 throw new Error(data?.detail || "Upload failed");
             }
-            setMediaStatus("Uploaded: " + data.attachment.filename, "success");
+            setMediaStatus(`Uploaded: ${data.attachment.filename} (${data.attachment.media_type})`, "success");
+            await refreshMediaList();
         } catch (err) {
             setMediaStatus("Media upload failed", "error");
         } finally {
             mediaInput.value = "";
         }
     };
+}
+
+if (clearMediaBtn) {
+    clearMediaBtn.onclick = async () => {
+        if (!chatId) {
+            setMediaStatus("Start a chat first", "warn");
+            return;
+        }
+        if (!confirm("Clear uploaded images/videos for this chat?")) return;
+        try {
+            const res = await fetch(`/api/media/clear?chat_id=${encodeURIComponent(chatId)}`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.detail || "Clear failed");
+            setMediaStatus("Media cleared", "success");
+            await refreshMediaList();
+        } catch (err) {
+            setMediaStatus("Failed to clear media", "error");
+        }
+    };
+}
+
+if (sendTextBtn) {
+    sendTextBtn.onclick = (e) => {
+        e.preventDefault?.();
+        sendManualText();
+    };
+}
+
+if (textInput) {
+    textInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendManualText();
+        }
+    });
 }
 
 // Chat Helpers
@@ -339,6 +467,7 @@ startBtn.onclick = async () => {
             connStatus.className = "text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest";
             connIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30";
             btnText.innerText = "End Session";
+            setManualInputEnabled(true);
             startRecording(stream);
         };
 
@@ -347,7 +476,8 @@ startBtn.onclick = async () => {
                 const data = JSON.parse(e.data);
                 if (data.event?.chatInit?.chatId) {
                     chatId = data.event.chatInit.chatId;
-                    setUploadStatus("Chat ID: " + chatId, "info");
+                    setChatIdDisplay(chatId);
+                    await refreshMediaList();
                     return;
                 }
                 if (data.event?.textOutput) {
