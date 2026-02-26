@@ -23,12 +23,40 @@ The project is divided by functionality to ensure maintainability and extensibil
 
 ## 🚀 Key Features
 
--   **Intelligent RAG:** Ingest PDFs or text files via the dashboard and ask questions about them instantly.
--   **Deep Web Search:** When asked, the bot searches the entire web using DuckDuckGo (no API keys required).
--   **Natural Interruption (Barge-in):** Speak over the bot at any time; it will stop instantly and listen to your new command.
--   **Smooth Audio:** Implements a **Scheduled Playback Queue** and jitter buffer in the browser to prevent choppy voice.
--   **Session Privacy:** The knowledge base is automatically cleared after every session to ensure a fresh start.
--   **Universal Auth:** Supports AWS IAM Keys, SSO Sessions, and Bedrock Bearer Tokens.
+-   **Intelligent RAG (chat-scoped):** Upload PDFs or text files and ask questions grounded in *only the files for your current chat*.
+-   **Web Search + Grounding (optional):** Uses DuckDuckGo by default, and can optionally use **Amazon Nova Web Grounding** to return answers with sources.
+-   **Natural Interruption (barge-in):** Speak over the assistant at any time; it stops and listens to your new input.
+-   **Smooth Audio Playback:** Browser-side queueing reduces choppy output during real-time streaming.
+-   **Session Isolation & Cleanup:** Each WebSocket connection gets its own `chat_id`; documents are cleared when the session ends.
+-   **Flexible AWS Auth:** Works with AWS IAM keys, SSO sessions, and Bedrock bearer tokens (via environment variables).
+
+## ✨ Detailed Features
+
+### Voice + Real-Time Conversation (Nova Sonic)
+
+- **Streaming speech in/out:** Uses a WebSocket to stream microphone audio to the server and audio responses back to the browser.
+- **Turn detection / endpointing:** Configure endpointing sensitivity (`LOW`, `MEDIUM`, `HIGH`) from the UI.
+- **Model inference controls:** Adjust `temperature`, `top_p`, and `max_tokens` per-session from the dashboard.
+- **Languages & code-switching:** Set assistant language (or auto) and optionally allow code-switching.
+
+### Retrieval-Augmented Generation (ChromaDB + Titan Embeddings)
+
+- **Supported uploads:** PDF and plain text.
+- **Chat-scoped indexing:** Every chunk is tagged with `chat_id` and retrieved using `where={"chat_id": ...}` so chats are isolated.
+- **Automatic cleanup:** On WebSocket disconnect, the server clears that chat’s Chroma entries.
+
+### Web Search (DDGS + Nova Lite) and Web Grounding (Nova System Tool)
+
+- **Default web search:** Uses DuckDuckGo search results (`ddgs`) and has Nova Lite synthesize a concise answer.
+- **Optional Web Grounding:** Uses Bedrock Converse with `toolConfig` → `systemTool: nova_grounding` to produce an answer grounded in current web content.
+- **Sources:** When Web Grounding is used, the tool extracts citation URLs from the Converse response and includes a short `Sources: ...` line (domains) for voice-friendly attribution.
+- **Availability:** Web Grounding is generally US-region only; configure the model ID and region accordingly.
+
+### Frontend Dashboard
+
+- **Dark/light theme toggle** with readable chat bubbles and transcript styling.
+- **Knowledge sidebar:** Upload, status, and reset (per chat).
+- **Session settings sidebar:** Voice selection, locale, polyglot option, language settings, and inference sliders.
 
 ## 🎮 Getting Started
 
@@ -37,11 +65,44 @@ The project is divided by functionality to ensure maintainability and extensibil
 3.  **Run:** `uv run main.py`
 4.  **Interact:** Open `http://127.0.0.1:8000`, upload a file, and start talking!
 
+## ⚙️ Configuration
+
+Environment variables are loaded from `.env` (see `src/core/config.py`).
+
+### AWS
+
+- `AWS_REGION` (default: `us-east-1`)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` (optional)
+- `BEDROCK_API_KEY` (optional, if using bearer token auth in your environment)
+
+### Models
+
+- `NOVA_SONIC_MODEL_ID` (default: `amazon.nova-2-sonic-v1:0`)
+- `NOVA_LITE_MODEL_ID` (default: `amazon.nova-lite-v1:0`)
+- `NOVA_GROUNDING_MODEL_ID` (default: `us.amazon.nova-2-lite-v1:0`)
+
+### Web Search Backend
+
+- `WEB_SEARCH_BACKEND`:
+  - `auto` (default): try Web Grounding first, then fall back to DuckDuckGo
+  - `grounding`: only Web Grounding (no DuckDuckGo)
+  - `ddgs`: only DuckDuckGo + synthesis
+- `WEB_SEARCH_MAX_SOURCES` (default: `3`): maximum domains to list in `Sources:` when grounded
+
 ## 💬 Chat Sessions (Chat ID)
 
 - Each WebSocket connection gets a unique `chat_id`.
 - File ingestion is scoped to that `chat_id`, so one chat cannot “see” another chat’s documents.
 - When the chat ends (WebSocket disconnect), the server clears both the chat session memory and that chat’s RAG context from ChromaDB.
+
+## 🔌 API Endpoints
+
+- `GET /` serves the dashboard UI.
+- `GET /static/*` serves frontend assets.
+- `WebSocket /ws` starts a voice session and returns a `chatInit` event containing `chatId`.
+- `POST /api/knowledge/ingest?chat_id=...` ingests a document into the chat-scoped knowledge base.
+- `POST /api/knowledge/reset?chat_id=...` clears the chat’s knowledge base.
+- `GET /api/knowledge/list?chat_id=...` lists documents for the chat.
 
 ---
 Built for high-performance AI research and real-time document interaction.
