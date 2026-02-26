@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.core.config import settings
 from src.core.auth import get_aws_session
+from src.core.sessions import SessionStore
 from src.services.knowledge_base import KnowledgeBaseService
 from src.services.voice_orchestrator import VoiceOrchestrator
 from src.api.routes import ingest, websocket
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     # Store in app state for route access
     app.state.kb = kb_service
     app.state.orchestrator = orchestrator
+    app.state.sessions = SessionStore()
 
     # Mount Static Files
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -46,13 +48,6 @@ def create_app() -> FastAPI:
     async def index():
         with open("index.html", "r") as f:
             return f.read()
-
-    # Legacy compatibility redirects
-    @app.post("/ingest")
-    async def legacy_ingest(file=None): return await ingest.ingest_document(None, file)
-    
-    @app.post("/reset")
-    async def legacy_reset(): return await ingest.reset_kb(None)
 
     return app
 

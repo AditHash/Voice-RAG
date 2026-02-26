@@ -36,3 +36,10 @@ Thumbs.db
 
 chroma_db/
 static/js/app.js.
+
+# Local backups / scratch
+index.html.bak
+scripts/autocommit.ps1
+AGENTS.md
+GEMINI.md
+updated-doc.md

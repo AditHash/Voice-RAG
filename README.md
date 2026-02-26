@@ -14,12 +14,12 @@ Unlike standard voice bots, Voice-RAG splits the "thinking" from the "speaking":
 
 The project is divided by functionality to ensure maintainability and extensibility:
 
--   **`main.py`**: The entry point. Manages the FastAPI server, WebSocket bridging, and API endpoints (`/ingest`, `/reset`).
--   **`voice_agent.py`**: The orchestrator. Assembles the `BidiAgent`, defines the system persona, and integrates the tools.
--   **`knowledge_base.py`**: The data layer. Handles PDF/Text parsing, ChromaDB operations, and embedding generation.
--   **`knowledge_base_tool.py`**: The RAG tool. Connects the agent to the knowledge base and invokes **Nova Lite** for synthesis.
--   **`web_search_tool.py`**: The Web tool. Performs DuckDuckGo searches and utilizes **Nova Lite** to summarize internet results.
--   **`config.py`**: Centralized configuration for models, regions, and audio parameters.
+-   **`main.py`**: The entry point. Manages the FastAPI server and mounts the WebSocket + knowledge routes.
+-   **`src/services/voice_orchestrator.py`**: Assembles the `BidiAgent`, defines the system persona, and integrates tools.
+-   **`src/services/knowledge_base.py`**: The data layer. Handles PDF/Text parsing, ChromaDB operations, and embedding generation.
+-   **`src/tools/rag.py`**: The RAG tool. Retrieves chat-scoped context and uses **Nova Lite** to synthesize an answer.
+-   **`src/tools/web.py`**: The Web tool. Searches DuckDuckGo and uses **Nova Lite** to summarize results.
+-   **`src/core/config.py`**: Centralized configuration for models, regions, and audio parameters.
 
 ## 🚀 Key Features
 
@@ -36,6 +36,12 @@ The project is divided by functionality to ensure maintainability and extensibil
 2.  **Configure:** Add your AWS credentials to `.env`.
 3.  **Run:** `uv run main.py`
 4.  **Interact:** Open `http://127.0.0.1:8000`, upload a file, and start talking!
+
+## 💬 Chat Sessions (Chat ID)
+
+- Each WebSocket connection gets a unique `chat_id`.
+- File ingestion is scoped to that `chat_id`, so one chat cannot “see” another chat’s documents.
+- When the chat ends (WebSocket disconnect), the server clears both the chat session memory and that chat’s RAG context from ChromaDB.
 
 ---
 Built for high-performance AI research and real-time document interaction.
