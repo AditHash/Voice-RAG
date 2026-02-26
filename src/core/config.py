@@ -6,7 +6,7 @@ load_dotenv()
 
 class Settings:
     PROJECT_NAME: str = "Voice-RAG"
-    BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
+    BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
     
     # AWS Configuration
     AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
@@ -18,7 +18,17 @@ class Settings:
     # Models
     NOVA_SONIC_MODEL_ID: str = "amazon.nova-2-sonic-v1:0"
     NOVA_LITE_MODEL_ID: str = "amazon.nova-lite-v1:0"
+    # Web grounding (Nova system tool "nova_grounding" via Bedrock Converse toolConfig).
+    # Defaults mirror AWS docs: grounding is currently US-region only and may require a "us." model prefix.
+    NOVA_GROUNDING_MODEL_ID: str = os.getenv("NOVA_GROUNDING_MODEL_ID", "us.amazon.nova-2-lite-v1:0")
     TITAN_EMBED_MODEL_ID: str = "amazon.titan-embed-text-v2:0"
+
+    # Web search behavior
+    # - "auto": try nova_grounding, then fall back to DDGS+Nova Lite synthesis
+    # - "grounding": only nova_grounding (no external web calls)
+    # - "ddgs": only DDGS+Nova Lite synthesis
+    WEB_SEARCH_BACKEND: str = os.getenv("WEB_SEARCH_BACKEND", "auto").lower()
+    WEB_SEARCH_MAX_SOURCES: int = int(os.getenv("WEB_SEARCH_MAX_SOURCES", "3"))
     
     # Audio
     INPUT_SAMPLE_RATE: int = 16000
